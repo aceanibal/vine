@@ -20,11 +20,20 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="trade"
+        name="exchange"
         options={{
-          title: 'Trade',
+          title: 'Exchange',
           tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="trending-up" size={size} color={color} />
+            <MaterialIcons name="currency-exchange" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="transfer"
+        options={{
+          title: 'Transfer',
+          tabBarIcon: ({ color, size }) => (
+            <MaterialIcons name="send" size={size} color={color} />
           ),
         }}
       />
