@@ -13,7 +13,7 @@ type ScreenContentProps = {
 export const ScreenContent = ({ title, path, children }: ScreenContentProps) => {
   return (
     <View style={styles.container}>
-      <Text variant="title1" className="text-center">
+      <Text className="text-center">
         {title}
       </Text>
       <View style={styles.separator} />

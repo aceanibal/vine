@@ -1,4 +1,3 @@
-import { VariantProps, cva } from 'class-variance-authority';
 import { cssInterop } from 'nativewind';
 import * as React from 'react';
 import { UITextView } from 'react-native-uitextview';
@@ -7,49 +6,38 @@ import { cn } from '~/lib/cn';
 
 cssInterop(UITextView, { className: 'style' });
 
-const textVariants = cva('text-foreground', {
-  variants: {
-    variant: {
-      largeTitle: 'text-4xl',
-      title1: 'text-2xl',
-      title2: 'text-[22px] leading-7',
-      title3: 'text-xl',
-      heading: 'text-[17px] leading-6 font-semibold',
-      body: 'text-[17px] leading-6',
-      callout: 'text-base',
-      subhead: 'text-[15px] leading-6',
-      footnote: 'text-[13px] leading-5',
-      caption1: 'text-xs',
-      caption2: 'text-[11px] leading-4',
-    },
-    color: {
-      primary: '',
-      secondary: 'text-secondary-foreground/90',
-      tertiary: 'text-muted-foreground/90',
-      quarternary: 'text-muted-foreground/50',
-    },
-  },
-  defaultVariants: {
-    variant: 'body',
-    color: 'primary',
-  },
-});
+/**
+ * Standard Tailwind Text Sizing Guide:
+ * 
+ * Headers:
+ * - text-2xl font-bold (24px) - Main page titles (h1)
+ * - text-lg font-semibold (18px) - Section headers (h2)
+ * - text-base font-semibold (16px) - Subsection headers (h3)
+ * 
+ * Body Text:
+ * - text-lg (18px) - Large body text
+ * - text-base (16px) - Regular body text (default)
+ * - text-sm (14px) - Small body text
+ * 
+ * Captions:
+ * - text-xs (12px) - Small captions (rarely used)
+ * 
+ * Usage: <Text className="text-lg font-bold">Title</Text>
+ */
 
 const TextClassContext = React.createContext<string | undefined>(undefined);
 
 function Text({
   className,
-  variant,
-  color,
   ...props
-}: React.ComponentPropsWithoutRef<typeof UITextView> & VariantProps<typeof textVariants>) {
+}: React.ComponentPropsWithoutRef<typeof UITextView>) {
   const textClassName = React.useContext(TextClassContext);
   return (
     <UITextView
-      className={cn(textVariants({ variant, color }), textClassName, className)}
+      className={cn('text-foreground', textClassName, className)}
       {...props}
     />
   );
 }
 
-export { Text, TextClassContext, textVariants };
+export { Text, TextClassContext };

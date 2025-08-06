@@ -46,6 +46,42 @@ export default function TabLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="transactions"
+        options={{
+          href: null, // This hides the tab from the bottom navigation
+        }}
+      />
+      <Tabs.Screen
+        name="account-details"
+        options={{
+          href: null, // This hides the tab from the bottom navigation
+        }}
+      />
+      <Tabs.Screen
+        name="send"
+        options={{
+          href: null, // This hides the tab from the bottom navigation
+        }}
+      />
+      <Tabs.Screen
+        name="receive"
+        options={{
+          href: null, // This hides the tab from the bottom navigation
+        }}
+      />
+      <Tabs.Screen
+        name="buy"
+        options={{
+          href: null, // This hides the tab from the bottom navigation
+        }}
+      />
+      <Tabs.Screen
+        name="sell"
+        options={{
+          href: null, // This hides the tab from the bottom navigation
+        }}
+      />
     </Tabs>
   );
 } 

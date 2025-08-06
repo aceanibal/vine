@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
-import { Platform, View, type ViewStyle } from 'react-native';
+import { Platform, View, ScrollView, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect } from 'react';
 
@@ -22,7 +22,9 @@ export default function WelcomeConsentScreen() {
   const checkWalletExists = async () => {
     try {
       const hasWallet = await WalletStorage.hasWallet();
+      console.log('Wallet check result:', hasWallet);
       if (hasWallet) {
+        console.log('Redirecting to dashboard');
         router.replace('/(tabs)/dashboard');
       }
     } catch (error) {
@@ -31,84 +33,97 @@ export default function WelcomeConsentScreen() {
   };
   
   const handleCreateWallet = () => {
-    router.push('/(auth)/create-wallet' as any);
+    console.log('Create wallet button pressed');
+    router.replace('/(auth)/create-wallet' as any);
   };
   
   const handleImportWallet = () => {
-    router.push('/(auth)/import-wallet' as any);
+    router.replace('/(auth)/import-wallet' as any);
   };
 
   return (
     <SafeAreaView style={ROOT_STYLE}>
-      <View className="mx-auto max-w-sm flex-1 justify-between gap-4 px-8 py-4 ">
-        <View className="ios:pt-8 pt-12">
-          <Text variant="largeTitle" className="ios:text-left ios:font-black text-center font-bold">
-            Welcome to
-          </Text>
-          <Text
-            variant="largeTitle"
-            className="ios:text-left ios:font-black text-primary text-center font-bold">
-            Vine Wallet
-          </Text>
-        </View>
-        <View className="gap-8">
-          {FEATURES.map((feature) => (
-            <View key={feature.title} className="flex-row gap-4">
-              <View className="pt-px">
-                <MaterialIcons
-                  name={feature.icon}
-                  size={38}
-                  color={colors.primary}
-                />
-              </View>
-              <View className="flex-1">
-                <Text className="font-bold">{feature.title}</Text>
-                <Text variant="footnote">{feature.description}</Text>
-              </View>
-            </View>
-          ))}
-        </View>
-        <View className="gap-4">
-          <View className="gap-3">
-            <Button 
-              size={Platform.select({ ios: 'lg', default: 'md' })}
-              onPress={handleCreateWallet}
-            >
-              <MaterialIcons name="add-circle" size={20} color="white" />
-              <Text>Create New Vine Wallet</Text>
-            </Button>
-            <Button 
-              variant="secondary"
-              size={Platform.select({ ios: 'lg', default: 'md' })}
-              onPress={handleImportWallet}
-            >
-              <MaterialIcons name="file-download" size={20} color={colors.primary} />
-              <Text>Import Existing Wallet</Text>
-            </Button>
+      <ScrollView 
+        className="flex-1" 
+        contentContainerClassName="px-8 py-4"
+        showsVerticalScrollIndicator={false}
+      >
+        <View className="mx-auto max-w-sm gap-6">
+          {/* Header */}
+          <View className="ios:pt-8 pt-12">
+            <Text className="ios:text-left ios:font-black text-center">
+              Welcome to
+            </Text>
+            <Text
+              className="ios:text-left ios:font-black text-primary text-center">
+              Vine Wallet
+            </Text>
           </View>
-          <View className="items-center">
+
+          {/* Features */}
+          <View className="gap-6">
+            {FEATURES.map((feature) => (
+              <View key={feature.title} className="flex-row gap-4">
+                <View className="pt-px">
+                  <MaterialIcons
+                    name={feature.icon}
+                    size={32}
+                    color={colors.primary}
+                  />
+                </View>
+                <View className="flex-1">
+                  <Text className="font-bold">{feature.title}</Text>
+                  <Text>{feature.description}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+
+          {/* Buttons */}
+          <View className="gap-4">
+            <View className="gap-3">
+              <Button 
+                size={Platform.select({ ios: 'lg', default: 'md' })}
+                onPress={handleCreateWallet}
+              >
+                <MaterialIcons name="add-circle" size={20} color="white" />
+                <Text>Create New Vine Wallet</Text>
+              </Button>
+              <Button 
+                variant="secondary"
+                size={Platform.select({ ios: 'lg', default: 'md' })}
+                onPress={handleImportWallet}
+              >
+                <MaterialIcons name="file-download" size={20} color={colors.primary} />
+                <Text>Import Existing Wallet</Text>
+              </Button>
+            </View>
+          </View>
+
+          {/* Footer */}
+          <View className="items-center gap-2">
             <MaterialIcons
               name="cloud-sync"
-              size={24}
+              size={20}
               color={colors.primary}
             />
-            <Text variant="caption2" className="pt-1 text-center">
+            <Text className="text-xs text-center">
               Vine connects to secure backend services for easy crypto management and account recovery. By continuing, you agree to our{' '}
               <Link href="/">
-                <Text variant="caption2" className="text-primary">
+                <Text className="text-xs text-primary">
                   Terms of Service
                 </Text>
               </Link>{' '}
               and{' '}
               <Link href="/">
-                <Text variant="caption2" className="text-primary">
+                <Text className="text-xs text-primary">
                   Privacy Policy
                 </Text>
               </Link>
             </Text>
           </View>
         </View>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

@@ -24,7 +24,10 @@ export default function CreateWalletScreen() {
   const [hasConfirmed, setHasConfirmed] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
 
+  console.log('CreateWalletScreen rendered');
+
   useEffect(() => {
+    console.log('CreateWalletScreen useEffect triggered');
     // Generate a new mnemonic when component mounts
     const newMnemonic = ethers.Wallet.createRandom().mnemonic?.phrase || '';
     setMnemonic(newMnemonic);
@@ -50,7 +53,7 @@ export default function CreateWalletScreen() {
       const wallet = ethers.Wallet.fromPhrase(mnemonic);
       
       // Save wallet to secure storage
-      await WalletStorage.saveWallet(wallet, mnemonic);
+      await WalletStorage.saveWallet(wallet as any, mnemonic);
       
       Alert.alert(
         'Wallet Created Successfully!',
@@ -75,12 +78,27 @@ export default function CreateWalletScreen() {
   };
 
   const handleBack = () => {
-    router.back();
+    router.replace('/');
   };
 
   return (
     <SafeAreaView style={ROOT_STYLE}>
       <View className="mx-auto max-w-sm flex-1 px-8 py-4">
+        {/* Header */}
+        <View className="flex-row items-center justify-between pb-6">
+          <Button
+            variant="plain"
+            size="icon"
+            onPress={handleBack}
+            className="h-10 w-10"
+          >
+            <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
+          </Button>
+          <Text className="font-bold">
+            Create Wallet
+          </Text>
+          <View style={{ width: 40 }} />
+        </View>
 
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
           <View className="gap-6">
@@ -88,18 +106,18 @@ export default function CreateWalletScreen() {
             <View className="gap-3 rounded-xl bg-orange-50 p-4 dark:bg-orange-950/20">
               <View className="flex-row items-center gap-2">
                 <MaterialIcons name="warning" size={20} color="#f97316" />
-                <Text variant="heading" className="text-orange-600 dark:text-orange-400">
+                <Text className="text-orange-600 dark:text-orange-400">
                   Write Down Your Recovery Phrase
                 </Text>
               </View>
-              <Text variant="footnote" className="text-orange-700 dark:text-orange-300">
+              <Text className="text-xs text-orange-700 dark:text-orange-300">
                 This 12-word phrase is the only way to recover your wallet. Write it down and keep it safe. Never share it with anyone.
               </Text>
             </View>
 
             {/* Mnemonic Display */}
             <View className="gap-4">
-              <Text variant="heading" className="text-center">
+              <Text className="text-center">
                 Your Recovery Phrase
               </Text>
               
@@ -110,10 +128,10 @@ export default function CreateWalletScreen() {
                       key={index}
                       className="flex-row items-center gap-1 rounded-lg bg-muted px-3 py-2"
                     >
-                      <Text variant="caption1" className="text-muted-foreground">
+                      <Text className="text-xs text-muted-foreground">
                         {index + 1}.
                       </Text>
-                      <Text variant="body" className="font-medium">
+                      <Text className="font-medium">
                         {word}
                       </Text>
                     </View>
@@ -121,7 +139,7 @@ export default function CreateWalletScreen() {
                 </View>
               </View>
 
-              <Text variant="footnote" className="text-center text-muted-foreground">
+              <Text className="text-xs text-center text-muted-foreground">
                 Write down each word in order. You'll need this to recover your wallet.
               </Text>
             </View>
@@ -139,7 +157,7 @@ export default function CreateWalletScreen() {
                   size={20}
                   color={hasConfirmed ? "white" : colors.primary}
                 />
-                <Text className="text-left">
+                <Text className="text-sm text-left">
                   I have written down my recovery phrase
                 </Text>
               </Button>

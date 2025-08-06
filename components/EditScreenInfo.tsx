@@ -9,13 +9,13 @@ export default function EditScreenInfo({ path }: { path: string }) {
 
   return (
     <View style={styles.getStartedContainer}>
-      <Text variant="heading" className="text-center">
+      <Text className="text-center">
         {title}
       </Text>
       <View style={[styles.codeHighlightContainer, styles.homeScreenFilename]}>
         <Text>{path}</Text>
       </View>
-      <Text variant="body" className="text-center">
+      <Text className="text-center">
         {description}
       </Text>
     </View>

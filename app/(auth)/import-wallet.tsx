@@ -37,7 +37,8 @@ export default function ImportWalletScreen() {
   const handleMnemonicChange = (text: string) => {
     setMnemonic(text);
     const isValid = validateMnemonic(text);
-    setIsValidMnemonic(isValid);
+    // Ensure we pass a boolean value to setIsValidMnemonic
+    setIsValidMnemonic(Boolean(isValid));
   };
 
   const handleImportWallet = async () => {
@@ -57,7 +58,7 @@ export default function ImportWalletScreen() {
       const wallet = ethers.Wallet.fromPhrase(mnemonic.trim());
       
       // Save wallet to secure storage
-      await WalletStorage.saveWallet(wallet, mnemonic.trim());
+      await WalletStorage.saveWallet(wallet as any, mnemonic.trim());
       
       Alert.alert(
         'Wallet Imported Successfully!',
@@ -82,7 +83,7 @@ export default function ImportWalletScreen() {
   };
 
   const handleBack = () => {
-    router.back();
+    router.replace('/');
   };
 
   const wordCount = mnemonic.trim().split(/\s+/).filter(word => word.length > 0).length;
@@ -100,7 +101,7 @@ export default function ImportWalletScreen() {
           >
             <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
           </Button>
-          <Text variant="title2" className="font-bold">
+          <Text className="font-bold">
             Import Wallet
           </Text>
           <View className="w-10" />
@@ -112,18 +113,18 @@ export default function ImportWalletScreen() {
             <View className="gap-3 rounded-xl bg-blue-50 p-4 dark:bg-blue-950/20">
               <View className="flex-row items-center gap-2">
                 <MaterialIcons name="info" size={20} color="#3b82f6" />
-                <Text variant="heading" className="text-blue-600 dark:text-blue-400">
+                <Text className="text-blue-600 dark:text-blue-400">
                   Enter Your Recovery Phrase
                 </Text>
               </View>
-              <Text variant="footnote" className="text-blue-700 dark:text-blue-300">
+              <Text className="text-xs text-blue-700 dark:text-blue-300">
                 Enter your 12-word recovery phrase to import your existing wallet. Make sure you're in a private space and no one can see your screen.
               </Text>
             </View>
 
             {/* Mnemonic Input */}
             <View className="gap-4">
-              <Text variant="heading" className="text-center">
+              <Text className="text-center">
                 Recovery Phrase
               </Text>
               
@@ -131,7 +132,7 @@ export default function ImportWalletScreen() {
                 <TextInput
                   className="min-h-[120] rounded-xl border border-border bg-card p-4 text-body"
                   placeholder="Enter your 12-word recovery phrase..."
-                  placeholderTextColor={colors.mutedForeground}
+                  placeholderTextColor={colors.grey2}
                   value={mnemonic}
                   onChangeText={handleMnemonicChange}
                   multiline
@@ -142,7 +143,7 @@ export default function ImportWalletScreen() {
                 />
                 
                 <View className="flex-row items-center justify-between">
-                  <Text variant="caption1" className="text-muted-foreground">
+                  <Text className="text-xs text-muted-foreground">
                     {wordCount}/12 words
                   </Text>
                   {mnemonic.length > 0 && (
@@ -153,8 +154,7 @@ export default function ImportWalletScreen() {
                         color={isValidMnemonic ? colors.primary : colors.destructive} 
                       />
                       <Text 
-                        variant="caption1" 
-                        className={isValidMnemonic ? "text-primary" : "text-destructive"}
+                        className={isValidMnemonic ? "text-xs text-primary" : "text-xs text-destructive"}
                       >
                         {isValidMnemonic ? "Valid phrase" : "Invalid phrase"}
                       </Text>
@@ -163,7 +163,7 @@ export default function ImportWalletScreen() {
                 </View>
               </View>
 
-              <Text variant="footnote" className="text-center text-muted-foreground">
+              <Text className="text-xs text-center text-muted-foreground">
                 Enter each word separated by spaces. The phrase is case-insensitive.
               </Text>
             </View>
@@ -172,11 +172,11 @@ export default function ImportWalletScreen() {
             <View className="gap-3 rounded-xl bg-orange-50 p-4 dark:bg-orange-950/20">
               <View className="flex-row items-center gap-2">
                 <MaterialIcons name="security" size={20} color="#f97316" />
-                <Text variant="heading" className="text-orange-600 dark:text-orange-400">
+                <Text className="text-orange-600 dark:text-orange-400">
                   Security Reminder
                 </Text>
               </View>
-              <Text variant="footnote" className="text-orange-700 dark:text-orange-300">
+              <Text className="text-xs text-orange-700 dark:text-orange-300">
                 Never share your recovery phrase with anyone. Vine staff will never ask for your recovery phrase. Your phrase will be stored securely on your device.
               </Text>
             </View>
