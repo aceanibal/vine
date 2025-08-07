@@ -7,14 +7,17 @@ import "@ethersproject/shims";
 import { MaterialIcons } from '@expo/vector-icons';
 import { ethers } from 'ethers';
 import { router } from 'expo-router';
-import { Platform, View, ScrollView, Alert, TextInput } from 'react-native';
+import { Platform, View, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { WalletStorage } from '~/lib/walletStorage';
+import { BlockchainUtils } from '~/lib/blockchainUtils';
+import { BlockchainErrorHandler } from '~/lib/blockchainErrorHandler';
+import { CustomModal } from '~/components/CustomModal';
 
 const ROOT_STYLE = { flex: 1 };
 
