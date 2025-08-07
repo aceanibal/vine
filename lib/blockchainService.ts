@@ -691,7 +691,7 @@ export class BlockchainService {
     timestamp: number;
     status: number;
     input?: string;
-  }[] {
+  }[]> {
     try {
       if (!this.provider) {
         throw new Error('Provider not initialized');
