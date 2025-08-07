@@ -5,7 +5,8 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { MOCK_TRANSACTIONS, getTransactionIcon, getTransactionColor, getTransactionTitle, formatTimeAgo } from '~/lib/transactions';
+import { getTransactionIcon, getTransactionColor, getTransactionTitle, formatTimeAgo } from '~/lib/transactions';
+import { transactionManager } from '~/lib/transactionManager';
 import { getTokenById } from '~/lib/tokens';
 
 export default function TransferScreen() {
@@ -107,11 +108,16 @@ export default function TransferScreen() {
               </TouchableOpacity>
             </View>
             <View className="gap-3">
-              {MOCK_TRANSACTIONS.slice(0, 3).map((transaction) => {
+              {transactionManager.getRecentTransactions(3).map((transaction) => {
                 const token = getTokenById(transaction.tokenId);
                 const icon = getTransactionIcon(transaction.type);
                 const color = getTransactionColor(transaction.type);
                 const title = getTransactionTitle(transaction.type);
+
+                // Enhanced display for gas token and metadata
+                const displaySymbol = transaction.metadata?.tokenSymbol || token?.symbol || '';
+                const description = transaction.metadata?.description;
+                const isGasTransaction = transaction.tokenId === 'gas';
 
                 return (
                   <View key={transaction.id} className="flex-row items-center justify-between py-2">
@@ -126,22 +132,37 @@ export default function TransferScreen() {
                           color={color} 
                         />
                       </View>
-                      <View>
+                      <View className="flex-1">
                         <Text className="text-sm">
-                          {title} {token?.symbol}
+                          {title} {displaySymbol}
+                          {isGasTransaction && <Text className="text-xs text-orange-600"> (Gas)</Text>}
                         </Text>
+                        {description && (
+                          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                            {description}
+                          </Text>
+                        )}
                         <Text className="text-xs text-muted-foreground">
                           {formatTimeAgo(transaction.timestamp)}
                         </Text>
                       </View>
                     </View>
                     <View className="items-end">
-                      <Text className="text-sm">
-                        {transaction.amount.toFixed(2)} {token?.symbol}
-                      </Text>
-                      <Text className="text-xs text-muted-foreground">
-                        {formatCurrency(transaction.value)}
-                      </Text>
+                      {transaction.type !== 'approve' && transaction.type !== 'contract_deployment' && (
+                        <Text className="text-sm">
+                          {transaction.amount.toFixed(transaction.metadata?.tokenDecimals === 6 ? 2 : 4)} {displaySymbol}
+                        </Text>
+                      )}
+                      {transaction.value > 0 && (
+                        <Text className="text-xs text-muted-foreground">
+                          {formatCurrency(transaction.value)}
+                        </Text>
+                      )}
+                      {transaction.gasFee && (
+                        <Text className="text-xs text-orange-600">
+                          Gas: {transaction.gasFee.toFixed(6)} MATIC
+                        </Text>
+                      )}
                     </View>
                   </View>
                 );

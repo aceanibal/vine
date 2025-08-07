@@ -1,22 +1,22 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { View, ScrollView, TouchableOpacity, Alert, Text as RNText } from 'react-native';
+import { View, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 
-import { Button } from '~/components/nativewindui/Button';
+
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { MOCK_TRANSACTIONS, getTransactionIcon, getTransactionColor, getTransactionTitle, formatTimeAgo } from '~/lib/transactions';
+import { getTransactionIcon, getTransactionColor, getTransactionTitle, formatTimeAgo, Transaction } from '~/lib/transactions';
 import { getTokenById } from '~/lib/tokens';
+import { transactionManager } from '~/lib/transactionManager';
 
 export default function TransactionsScreen() {
   const { colors } = useColorScheme();
-  const [selectedFilter, setSelectedFilter] = useState<'all' | 'send' | 'receive' | 'swap' | 'stake'>('all');
+  const [selectedFilter, setSelectedFilter] = useState<'all' | 'send' | 'receive' | 'swap' | 'stake' | 'defi' | 'nft' | 'failed' | 'gas'>('all');
 
-  const filteredTransactions = selectedFilter === 'all' 
-    ? MOCK_TRANSACTIONS 
-    : MOCK_TRANSACTIONS.filter(tx => tx.type === selectedFilter);
+  // Use transaction manager as single source of truth
+  const filteredTransactions = transactionManager.getTransactionsByType(selectedFilter);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -31,11 +31,15 @@ export default function TransactionsScreen() {
     return `${address.slice(0, 6)}...${address.slice(-4)}`;
   };
 
-  const renderTransaction = (transaction: typeof MOCK_TRANSACTIONS[0]) => {
+  const renderTransaction = (transaction: Transaction) => {
     const token = getTokenById(transaction.tokenId);
     const icon = getTransactionIcon(transaction.type);
     const color = getTransactionColor(transaction.type);
     const title = getTransactionTitle(transaction.type);
+
+    // Use metadata for enhanced display information
+    const displaySymbol = transaction.metadata?.tokenSymbol || token?.symbol || '';
+    const description = transaction.metadata?.description || '';
 
     return (
       <TouchableOpacity 
@@ -59,39 +63,68 @@ export default function TransactionsScreen() {
           </View>
           <View className="flex-1">
             <Text className="font-semibold">
-              {title} {token?.symbol}
+              {title} {displaySymbol}
             </Text>
+            {description && (
+              <Text className="text-xs text-muted-foreground" numberOfLines={1}>
+                {description}
+              </Text>
+            )}
             <Text className="text-xs text-muted-foreground">
               {formatTimeAgo(transaction.timestamp)}
             </Text>
-            {transaction.sender && (
+            {transaction.sender && !transaction.isInternal && (
               <Text className="text-xs text-muted-foreground">
                 From: {formatAddress(transaction.sender)}
               </Text>
             )}
-            {transaction.recipient && (
+            {transaction.recipient && !transaction.isInternal && (
               <Text className="text-xs text-muted-foreground">
                 To: {formatAddress(transaction.recipient)}
+              </Text>
+            )}
+            {transaction.errorReason && (
+              <Text className="text-xs text-red-500">
+                {transaction.errorReason}
               </Text>
             )}
           </View>
         </View>
         <View className="items-end">
-          <Text className="font-semibold">
-            {transaction.amount.toFixed(2)} {token?.symbol}
-          </Text>
-          <Text className="text-xs text-muted-foreground">
-            {formatCurrency(transaction.value)}
-          </Text>
+          {transaction.type !== 'approve' && transaction.type !== 'contract_deployment' && (
+            <Text className="font-semibold">
+              {transaction.amount > 0 ? transaction.amount.toFixed(transaction.metadata?.tokenDecimals === 6 ? 2 : 4) : '0'} {displaySymbol}
+            </Text>
+          )}
+          {transaction.value > 0 && (
+            <Text className="text-xs text-muted-foreground">
+              {formatCurrency(transaction.value)}
+            </Text>
+          )}
+          {transaction.gasFee && (
+            <Text className="text-xs text-muted-foreground">
+              Gas: {transaction.gasFee.toFixed(6)} MATIC
+            </Text>
+          )}
           <View className="flex-row items-center gap-1 mt-1">
             <View 
               className="w-2 h-2 rounded-full"
-              style={{ backgroundColor: transaction.status === 'completed' ? '#4CAF50' : transaction.status === 'pending' ? '#FF9800' : '#F44336' }}
+              style={{ 
+                backgroundColor: transaction.status === 'completed' ? '#4CAF50' 
+                  : transaction.status === 'pending' ? '#FF9800' 
+                  : transaction.status === 'failed' || transaction.status === 'reverted' ? '#F44336'
+                  : '#757575'
+              }}
             />
             <Text className="text-xs text-muted-foreground capitalize">
               {transaction.status}
             </Text>
           </View>
+          {transaction.isInternal && (
+            <Text className="text-xs text-blue-500">
+              Internal
+            </Text>
+          )}
         </View>
       </TouchableOpacity>
     );
@@ -137,10 +170,12 @@ export default function TransactionsScreen() {
             contentContainerClassName="gap-2"
           >
             <FilterButton filter="all" label="All" />
+            <FilterButton filter="gas" label="Gas Token" />
             <FilterButton filter="receive" label="Received" />
             <FilterButton filter="send" label="Sent" />
-            <FilterButton filter="swap" label="Swapped" />
-            <FilterButton filter="stake" label="Staked" />
+            <FilterButton filter="defi" label="DeFi" />
+            <FilterButton filter="nft" label="NFTs" />
+            <FilterButton filter="failed" label="Failed" />
           </ScrollView>
 
           {/* Transactions List */}
