@@ -691,6 +691,9 @@ export class BlockchainService {
     timestamp: number;
     status: number;
     input?: string;
+    tokenAddress?: string;
+    tokenSymbol?: string;
+    tokenDecimals?: number;
   }[]> {
     try {
       if (!this.provider) {
@@ -699,62 +702,253 @@ export class BlockchainService {
 
       const currentBlock = await this.provider.getBlockNumber();
       const endBlock = currentBlock;
-      const fromBlock = Math.max(startBlock, currentBlock - 10000); // Limit to last 10k blocks to avoid timeout
+      const fromBlock = Math.max(startBlock, currentBlock - 2000); // Limit to last 2k blocks to avoid RPC limits
 
       console.log(`Fetching transaction history for ${address} from block ${fromBlock} to ${endBlock}`);
 
-      // Get the latest block for timestamp reference
-      const latestBlock = await this.provider.getBlock(currentBlock);
-      const currentTimestamp = latestBlock?.timestamp || Math.floor(Date.now() / 1000);
-
-      // This is a simplified approach - in production you'd use:
-      // 1. Block explorer APIs (Etherscan, Polygonscan, etc.)
-      // 2. Graph Protocol
-      // 3. Alchemy/Moralis APIs
-      // 4. Custom indexing service
-
       const transactions: any[] = [];
 
-      // For demonstration, let's create some sample transaction data based on the current wallet
-      // In a real implementation, you would query the blockchain or use an indexing service
-      
-      // Check if we have recent transactions by looking at the wallet's nonce
-      const nonce = await this.provider.getTransactionCount(address);
-      
-      if (nonce > 0) {
-        // Generate sample transactions based on nonce (this simulates real transaction fetching)
-        const baseTimestamp = currentTimestamp - (24 * 60 * 60); // 24 hours ago
-        
-        for (let i = 0; i < Math.min(nonce, limit); i++) {
-          const txTimestamp = baseTimestamp + (i * 3600); // 1 hour apart
-          const isOutgoing = i % 2 === 0;
-          
-          transactions.push({
-            hash: `0x${Math.random().toString(16).substr(2, 64)}`,
-            blockNumber: currentBlock - (nonce - i),
-            from: isOutgoing ? address : `0x${Math.random().toString(16).substr(2, 40)}`,
-            to: isOutgoing ? `0x${Math.random().toString(16).substr(2, 40)}` : address,
-            value: ethers.parseEther((Math.random() * 10).toFixed(4)).toString(),
-            gasUsed: '21000',
-            gasPrice: ethers.parseUnits('20', 'gwei').toString(),
-            timestamp: txTimestamp,
-            status: 1,
-            input: '0x'
-          });
-        }
-      }
+      // Import blockchain config to get token addresses
+      const { BLOCKCHAIN_CONFIG } = await import('./blockchainConfig');
 
-      // Sort by block number (newest first)
+      // Transaction history fetching temporarily disabled
+      // Focus on balance display for now - transaction history will be implemented later
+      console.log('Transaction history fetching disabled - focusing on balance display');
+
+      // Sort by block number (newest first) and limit results
       transactions.sort((a, b) => b.blockNumber - a.blockNumber);
+      const limitedTransactions = transactions.slice(0, limit);
 
-      console.log(`Found ${transactions.length} transactions for address ${address}`);
-      return transactions.slice(0, limit);
+      console.log(`Found ${limitedTransactions.length} total transactions for address ${address}`);
+      return limitedTransactions;
 
     } catch (error) {
       console.error('Error fetching transaction history:', error);
       // Return empty array on error rather than throwing
       return [];
     }
+  }
+
+  /**
+   * Fetch native MATIC transactions and generate sample data
+   */
+  private async fetchNativeTransactions(
+    address: string,
+    fromBlock: number,
+    toBlock: number,
+    limit: number
+  ): Promise<any[]> {
+    // For native transactions, we'd need to scan blocks or use an indexing service
+    // This is a simplified implementation that checks wallet nonce and generates sample data
+    const nonce = await this.provider!.getTransactionCount(address);
+    const transactions: any[] = [];
+
+    // Get the latest block for timestamp reference
+    const latestBlock = await this.provider!.getBlock(toBlock);
+    const currentTimestamp = latestBlock?.timestamp || Math.floor(Date.now() / 1000);
+    const baseTimestamp = currentTimestamp - (7 * 24 * 60 * 60); // 7 days ago
+
+    // Create sample MATIC transactions based on nonce or minimum sample data
+    const numTransactions = Math.max(Math.min(nonce, Math.floor(limit / 4)), 2); // At least 2 sample transactions
+    
+    for (let i = 0; i < numTransactions; i++) {
+      const txTimestamp = baseTimestamp + (i * 7200); // 2 hours apart
+      const isOutgoing = i % 2 === 0;
+      
+      transactions.push({
+        hash: `0x${Math.random().toString(16).substr(2, 64)}`,
+        blockNumber: toBlock - (numTransactions - i),
+        from: isOutgoing ? address : `0x${Math.random().toString(16).substr(2, 40)}`,
+        to: isOutgoing ? `0x${Math.random().toString(16).substr(2, 40)}` : address,
+        value: ethers.parseEther((Math.random() * 5).toFixed(4)).toString(),
+        gasUsed: '21000',
+        gasPrice: ethers.parseUnits('30', 'gwei').toString(),
+        timestamp: txTimestamp,
+        status: 1,
+        input: '0x',
+        tokenSymbol: 'MATIC'
+      });
+    }
+
+
+    return transactions;
+  }
+
+  /**
+   * Fetch ERC-20 token transactions using targeted Transfer event filters
+   * This approach specifically searches for transfers involving the user's address
+   */
+  private async fetchERC20Transactions(
+    tokenAddress: string,
+    tokenSymbol: string,
+    tokenDecimals: number,
+    userAddress: string,
+    fromBlock: number,
+    toBlock: number,
+    limit: number
+  ): Promise<any[]> {
+    try {
+      console.log(`Fetching ${tokenSymbol} transfers for ${userAddress} using targeted filters...`);
+
+      // ERC-20 Transfer event signature: Transfer(address indexed from, address indexed to, uint256 value)
+      const transferEventSignature = '0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef';
+      
+      // Pad the user address to 32 bytes for topic filtering
+      const paddedUserAddress = ethers.zeroPadValue(userAddress, 32);
+      
+      const transactions: any[] = [];
+      
+      // Create two separate targeted filters to avoid scanning all transfers
+      // 1. Transfers FROM the user (outgoing)
+      // 2. Transfers TO the user (incoming)
+      
+      const outgoingFilter = {
+        address: tokenAddress,
+        topics: [
+          transferEventSignature,
+          paddedUserAddress, // from: user's address
+          null              // to: any address
+        ],
+        fromBlock: fromBlock,
+        toBlock: toBlock
+      };
+      
+      const incomingFilter = {
+        address: tokenAddress,
+        topics: [
+          transferEventSignature,
+          null,              // from: any address
+          paddedUserAddress  // to: user's address
+        ],
+        fromBlock: fromBlock,
+        toBlock: toBlock
+      };
+
+      console.log(`Fetching outgoing ${tokenSymbol} transfers...`);
+      const outgoingLogs = await this.provider!.getLogs(outgoingFilter);
+      
+      console.log(`Fetching incoming ${tokenSymbol} transfers...`);
+      const incomingLogs = await this.provider!.getLogs(incomingFilter);
+      
+      // Combine and deduplicate logs
+      const allLogs = [...outgoingLogs, ...incomingLogs];
+      const uniqueLogs = allLogs.filter((log, index, self) => 
+        index === self.findIndex(l => l.transactionHash === log.transactionHash && l.index === log.index)
+      );
+      
+      console.log(`Found ${uniqueLogs.length} ${tokenSymbol} transfer events`);
+
+      // Process the transfer logs
+      for (const log of uniqueLogs.slice(0, limit)) {
+        try {
+          // Decode the transfer event
+          const fromAddress = '0x' + log.topics[1].slice(26); // Remove padding
+          const toAddress = '0x' + log.topics[2].slice(26);   // Remove padding
+          
+          const value = BigInt(log.data); // Transfer amount
+          const formattedValue = ethers.formatUnits(value, tokenDecimals);
+
+          // Get block details for timestamp
+          const block = await this.provider!.getBlock(log.blockNumber);
+          
+          transactions.push({
+            hash: log.transactionHash,
+            blockNumber: log.blockNumber,
+            from: fromAddress,
+            to: toAddress,
+            value: formattedValue,
+            gasUsed: '50000', // Approximate gas for ERC-20 transfers
+            gasPrice: '30000000000', // 30 gwei estimate
+            timestamp: block?.timestamp || Math.floor(Date.now() / 1000),
+            status: 1, // We only get successful transactions from logs
+            input: '0x',
+            tokenAddress: tokenAddress,
+            tokenSymbol: tokenSymbol,
+            tokenDecimals: tokenDecimals
+          });
+
+        } catch (error) {
+          console.warn(`Failed to process transfer log:`, error);
+          continue;
+        }
+      }
+
+      console.log(`Found ${transactions.length} ${tokenSymbol} transfers for ${userAddress}`);
+      return transactions;
+
+    } catch (error) {
+      console.error(`Error fetching ${tokenSymbol} transactions:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get transaction history for a specific ERC-20 token
+   */
+  public async getTokenTransactionHistory(
+    tokenAddress: string,
+    tokenSymbol: string,
+    tokenDecimals: number,
+    userAddress?: string,
+    limit: number = 20
+  ): Promise<any[]> {
+    try {
+      if (!this.provider) {
+        throw new Error('Provider not initialized');
+      }
+
+      const walletAddress = userAddress || await this.getWalletAddress();
+      if (!walletAddress) {
+        throw new Error('No wallet address available');
+      }
+
+      const currentBlock = await this.provider.getBlockNumber();
+      const fromBlock = Math.max(0, currentBlock - 5000); // Look back 5000 blocks
+
+      console.log(`Fetching ${tokenSymbol} transaction history for ${walletAddress}`);
+      
+      return await this.fetchERC20Transactions(
+        tokenAddress,
+        tokenSymbol,
+        tokenDecimals,
+        walletAddress,
+        fromBlock,
+        currentBlock,
+        limit
+      );
+
+    } catch (error) {
+      console.error(`Error fetching ${tokenSymbol} transaction history:`, error);
+      return [];
+    }
+  }
+
+  /**
+   * Get USDC transaction history specifically
+   */
+  public async getUSDCTransactionHistory(userAddress?: string, limit: number = 20): Promise<any[]> {
+    const { BLOCKCHAIN_CONFIG } = await import('./blockchainConfig');
+    return this.getTokenTransactionHistory(
+      BLOCKCHAIN_CONFIG.tokens.usd.address,
+      'USDC',
+      BLOCKCHAIN_CONFIG.tokens.usd.decimals,
+      userAddress,
+      limit
+    );
+  }
+
+  /**
+   * Get PAXG transaction history specifically
+   */
+  public async getPAXGTransactionHistory(userAddress?: string, limit: number = 20): Promise<any[]> {
+    const { BLOCKCHAIN_CONFIG } = await import('./blockchainConfig');
+    return this.getTokenTransactionHistory(
+      BLOCKCHAIN_CONFIG.tokens.gold.address,
+      'PAXG',
+      BLOCKCHAIN_CONFIG.tokens.gold.decimals,
+      userAddress,
+      limit
+    );
   }
 
   /**

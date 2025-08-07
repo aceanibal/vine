@@ -236,7 +236,50 @@ export class TransactionManager {
    */
   private convertBlockchainToUITransaction(blockchainTx: any, walletAddress: string): Transaction {
     const isReceived = blockchainTx.to.toLowerCase() === walletAddress.toLowerCase();
-    const amount = parseFloat(ethers.formatEther(blockchainTx.value));
+    
+    // Determine if this is an ERC-20 token transaction or native MATIC
+    const isERC20 = blockchainTx.tokenAddress && blockchainTx.tokenSymbol;
+    let tokenId: string;
+    let amount: number;
+    let tokenPrice: number;
+    let tokenSymbol: string;
+    let tokenName: string;
+    let tokenDecimals: number;
+
+    if (isERC20) {
+      // Handle ERC-20 token transactions
+      amount = parseFloat(blockchainTx.value); // Already formatted by blockchain service
+      tokenSymbol = blockchainTx.tokenSymbol;
+      tokenDecimals = blockchainTx.tokenDecimals;
+      
+      // Map token symbols to our internal token IDs and get prices
+      switch (tokenSymbol) {
+        case 'USDC':
+          tokenId = 'usd';
+          tokenPrice = 1.00; // USDC price
+          tokenName = 'USD Coin';
+          break;
+        case 'PAXG':
+          tokenId = 'gold';
+          tokenPrice = 1950.00; // PAXG price estimate
+          tokenName = 'PAX Gold';
+          break;
+        default:
+          tokenId = 'unknown';
+          tokenPrice = 0;
+          tokenName = tokenSymbol;
+      }
+    } else {
+      // Handle native MATIC transactions
+      tokenId = 'gas';
+      amount = parseFloat(ethers.formatEther(blockchainTx.value));
+      tokenPrice = 500.00; // MATIC price estimate
+      tokenSymbol = 'MATIC';
+      tokenName = 'Polygon';
+      tokenDecimals = 18;
+    }
+
+    // Calculate gas fee (always in MATIC)
     const gasFee = blockchainTx.gasUsed && blockchainTx.gasPrice 
       ? parseFloat(ethers.formatEther((BigInt(blockchainTx.gasUsed) * BigInt(blockchainTx.gasPrice)).toString()))
       : 0;
@@ -244,9 +287,9 @@ export class TransactionManager {
     return {
       id: `blockchain_${blockchainTx.hash}`,
       type: isReceived ? 'receive' : 'send',
-      tokenId: 'gas', // Assuming native token for now
+      tokenId,
       amount,
-      value: amount * 500, // Rough MATIC price estimate
+      value: amount * tokenPrice,
       timestamp: new Date(blockchainTx.timestamp * 1000),
       status: blockchainTx.status === 1 ? 'completed' : 'failed',
       sender: blockchainTx.from,
@@ -257,10 +300,11 @@ export class TransactionManager {
       gasPrice: blockchainTx.gasPrice ? parseInt(blockchainTx.gasPrice) : undefined,
       gasFee,
       metadata: {
-        description: isReceived ? 'Received MATIC' : 'Sent MATIC',
-        tokenSymbol: 'MATIC',
-        tokenDecimals: 18,
-        tokenName: 'Polygon'
+        description: isReceived ? `Received ${tokenSymbol}` : `Sent ${tokenSymbol}`,
+        tokenSymbol,
+        tokenDecimals,
+        tokenName,
+        ...(isERC20 && { tokenAddress: blockchainTx.tokenAddress })
       }
     };
   }
