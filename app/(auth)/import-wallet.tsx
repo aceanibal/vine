@@ -16,7 +16,7 @@ import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { WalletStorage } from '~/lib/walletStorage';
 
-const ROOT_STYLE = { flex: 1 };
+
 
 export default function ImportWalletScreen() {
   const { colors } = useColorScheme();
@@ -89,7 +89,7 @@ export default function ImportWalletScreen() {
   const wordCount = mnemonic.trim().split(/\s+/).filter(word => word.length > 0).length;
 
   return (
-    <SafeAreaView style={ROOT_STYLE}>
+    <SafeAreaView className="flex-1">
       <View className="mx-auto max-w-sm flex-1 px-8 py-4">
         {/* Header */}
         <View className="flex-row items-center justify-between pb-6">

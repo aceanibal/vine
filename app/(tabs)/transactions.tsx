@@ -125,7 +125,7 @@ export default function TransactionsScreen() {
         <Text className="font-bold">
           Transactions
         </Text>
-        <View style={{ width: 24 }} />
+        <View className="w-6" />
       </View>
 
       <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">

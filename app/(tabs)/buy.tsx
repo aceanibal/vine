@@ -273,7 +273,7 @@ export default function BuyScreen() {
         <Text className="font-bold">
           Buy Gold
         </Text>
-        <View style={{ width: 40 }} />
+                  <View className="w-10" />
       </View>
 
       <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">

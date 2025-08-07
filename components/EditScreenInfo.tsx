@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
 import { Text } from '~/components/nativewindui/Text';
 
@@ -8,11 +8,11 @@ export default function EditScreenInfo({ path }: { path: string }) {
     'Change any of the text, save the file, and your app will automatically update.';
 
   return (
-    <View style={styles.getStartedContainer}>
+    <View className="items-center mx-12">
       <Text className="text-center">
         {title}
       </Text>
-      <View style={[styles.codeHighlightContainer, styles.homeScreenFilename]}>
+      <View className="rounded px-1 my-2">
         <Text>{path}</Text>
       </View>
       <Text className="text-center">
@@ -21,28 +21,3 @@ export default function EditScreenInfo({ path }: { path: string }) {
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  codeHighlightContainer: {
-    borderRadius: 3,
-    paddingHorizontal: 4,
-  },
-  getStartedContainer: {
-    alignItems: 'center',
-    marginHorizontal: 50,
-  },
-  helpContainer: {
-    alignItems: 'center',
-    marginHorizontal: 20,
-    marginTop: 15,
-  },
-  helpLink: {
-    paddingVertical: 15,
-  },
-  helpLinkText: {
-    textAlign: 'center',
-  },
-  homeScreenFilename: {
-    marginVertical: 7,
-  },
-});

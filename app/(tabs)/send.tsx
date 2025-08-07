@@ -140,7 +140,7 @@ export default function SendScreen() {
         <Text className="text-lg font-bold">
           Send
         </Text>
-        <View style={{ width: 24 }} />
+        <View className="w-6" />
       </View>
 
       <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">

@@ -42,7 +42,7 @@ export default function WelcomeConsentScreen() {
   };
 
   return (
-    <SafeAreaView style={ROOT_STYLE}>
+    <SafeAreaView className="flex-1">
       <ScrollView 
         className="flex-1" 
         contentContainerClassName="px-8 py-4"

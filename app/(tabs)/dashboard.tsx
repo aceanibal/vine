@@ -97,11 +97,11 @@ export default function DashboardScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       <View className="flex-row items-center justify-between p-4 border-b border-border bg-white">
-        <View style={{ width: 24 }} />
+        <View className="w-6" />
         <Text className="text-lg font-bold">
           Wallet
         </Text>
-        <View style={{ width: 24 }} />
+        <View className="w-6" />
       </View>
       <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">
         <View className="gap-6">

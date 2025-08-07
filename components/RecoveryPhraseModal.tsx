@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { Modal, View, Text, TouchableOpacity, Dimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '~/lib/useColorScheme';
 
@@ -30,44 +30,72 @@ export function RecoveryPhraseModal({ visible, onClose, mnemonic }: RecoveryPhra
       animationType="slide"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
+      <View className="flex-1 justify-end">
         <TouchableOpacity 
-          style={styles.backdrop} 
+          className="absolute top-0 left-0 right-0 bottom-0 bg-black/50"
           activeOpacity={1} 
           onPress={onClose}
         />
-        <View style={[styles.modal, { backgroundColor: colors.card }]}>
+        <View 
+          className="rounded-t-2xl pt-2.5 px-5 pb-10"
+          style={{ 
+            backgroundColor: colors.card,
+            maxHeight: screenHeight * 0.8 
+          }}
+        >
           {/* Handle */}
-          <View style={styles.handleContainer}>
-            <View style={[styles.handle, { backgroundColor: colors.grey }]} />
+          <View className="items-center mb-2.5">
+            <View 
+              className="w-10 h-1 rounded-sm" 
+              style={{ backgroundColor: colors.grey }} 
+            />
           </View>
 
           {/* Header */}
-          <View style={styles.header}>
-            <Text style={[styles.title, { color: colors.foreground }]}>
+          <View className="flex-row justify-between items-center mb-5">
+            <Text 
+              className="text-xl font-bold" 
+              style={{ color: colors.foreground }}
+            >
               Recovery Phrase
             </Text>
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+            <TouchableOpacity onPress={onClose} className="p-1.5">
               <MaterialIcons name="close" size={24} color={colors.grey} />
             </TouchableOpacity>
           </View>
 
           {/* Warning */}
-          <View style={[styles.warningContainer, { backgroundColor: colors.background }]}>
+          <View 
+            className="flex-row items-center p-3 rounded-lg mb-5" 
+            style={{ backgroundColor: colors.background }}
+          >
             <MaterialIcons name="warning" size={20} color={colors.primary} />
-            <Text style={[styles.warningText, { color: colors.primary }]}>
+            <Text 
+              className="ml-2 text-sm font-medium" 
+              style={{ color: colors.primary }}
+            >
               Keep this phrase safe and never share it with anyone
             </Text>
           </View>
 
           {/* Words Grid */}
-          <View style={styles.wordsContainer}>
+          <View className="flex-row flex-wrap justify-between mb-5">
             {words.map((word, index) => (
-              <View key={index} style={[styles.wordItem, { backgroundColor: colors.background }]}>
-                <Text style={[styles.wordNumber, { color: colors.grey }]}>
+              <View 
+                key={index} 
+                className="flex-row items-center px-3 py-2 rounded-lg mb-2 w-[48%]" 
+                style={{ backgroundColor: colors.background }}
+              >
+                <Text 
+                  className="text-xs mr-1 font-medium" 
+                  style={{ color: colors.grey }}
+                >
                   {index + 1}.
                 </Text>
-                <Text style={[styles.wordText, { color: colors.foreground }]}>
+                <Text 
+                  className="text-sm font-semibold" 
+                  style={{ color: colors.foreground }}
+                >
                   {word}
                 </Text>
               </View>
@@ -75,8 +103,11 @@ export function RecoveryPhraseModal({ visible, onClose, mnemonic }: RecoveryPhra
           </View>
 
           {/* Instructions */}
-          <View style={styles.instructionsContainer}>
-            <Text style={[styles.instructionsText, { color: colors.grey }]}>
+          <View className="items-center">
+            <Text 
+              className="text-xs text-center leading-4" 
+              style={{ color: colors.grey }}
+            >
               Write down each word in order. You'll need this to recover your wallet.
             </Text>
           </View>
@@ -84,93 +115,4 @@ export function RecoveryPhraseModal({ visible, onClose, mnemonic }: RecoveryPhra
       </View>
     </Modal>
   );
-}
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-  },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-  },
-  modal: {
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    paddingTop: 10,
-    paddingHorizontal: 20,
-    paddingBottom: 40,
-    maxHeight: screenHeight * 0.8,
-  },
-  handleContainer: {
-    alignItems: 'center',
-    marginBottom: 10,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-  },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: 'bold',
-  },
-  closeButton: {
-    padding: 5,
-  },
-  warningContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 12,
-    borderRadius: 8,
-    marginBottom: 20,
-  },
-  warningText: {
-    marginLeft: 8,
-    fontSize: 14,
-    fontWeight: '500',
-  },
-  wordsContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'space-between',
-    marginBottom: 20,
-  },
-  wordItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    marginBottom: 8,
-    width: '48%',
-  },
-  wordNumber: {
-    fontSize: 12,
-    marginRight: 4,
-    fontWeight: '500',
-  },
-  wordText: {
-    fontSize: 14,
-    fontWeight: '600',
-  },
-  instructionsContainer: {
-    alignItems: 'center',
-  },
-  instructionsText: {
-    fontSize: 12,
-    textAlign: 'center',
-    lineHeight: 16,
-  },
-}); 
+} 

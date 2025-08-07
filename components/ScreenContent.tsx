@@ -1,8 +1,6 @@
-import { StyleSheet, View } from 'react-native';
+import { View } from 'react-native';
 
-import { Text } from '~/components/nativewindui/Text';
-
-import EditScreenInfo from './EditScreenInfo';
+import { EditScreenInfo } from './EditScreenInfo';
 
 type ScreenContentProps = {
   title: string;
@@ -12,27 +10,10 @@ type ScreenContentProps = {
 
 export const ScreenContent = ({ title, path, children }: ScreenContentProps) => {
   return (
-    <View style={styles.container}>
-      <Text className="text-center">
-        {title}
-      </Text>
-      <View style={styles.separator} />
+    <View className="flex-1 items-center justify-center">
       <EditScreenInfo path={path} />
+      <View className="my-8 h-px w-4/5 bg-gray-300" />
       {children}
     </View>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  separator: {
-    backgroundColor: '#d1d5db',
-    height: 1,
-    marginVertical: 30,
-    width: '80%',
-  },
-});

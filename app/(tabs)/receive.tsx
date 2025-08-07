@@ -67,7 +67,7 @@ export default function ReceiveScreen() {
           <Text className="font-bold">
             Receive
           </Text>
-          <View style={{ width: 24 }} />
+          <View className="w-6" />
         </View>
         <View className="flex-1 bg-gray-50 items-center justify-center">
           <Text>Loading wallet...</Text>
@@ -86,7 +86,7 @@ export default function ReceiveScreen() {
           <Text className="font-bold">
             Receive
           </Text>
-          <View style={{ width: 24 }} />
+          <View className="w-6" />
         </View>
         <View className="flex-1 bg-gray-50 items-center justify-center p-4">
           <MaterialIcons name="account-balance-wallet" size={64} color={colors.grey} />
@@ -110,7 +110,7 @@ export default function ReceiveScreen() {
         <Text className="font-bold">
           Receive
         </Text>
-        <View style={{ width: 24 }} />
+        <View className="w-6" />
       </View>
 
       <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">
@@ -207,19 +207,19 @@ export default function ReceiveScreen() {
             </Text>
             <View className="gap-3">
               <View className="flex-row items-start gap-3">
-                <MaterialIcons name="security" size={16} color={colors.primary} style={{ marginTop: 2 }} />
+                <MaterialIcons name="security" size={16} color={colors.primary} className="mt-0.5" />
                 <Text className="flex-1">
                   Only share this address with trusted sources
                 </Text>
               </View>
               <View className="flex-row items-start gap-3">
-                <MaterialIcons name="verified" size={16} color={colors.primary} style={{ marginTop: 2 }} />
+                <MaterialIcons name="verified" size={16} color={colors.primary} className="mt-0.5" />
                 <Text className="flex-1">
                   Verify the address before sending large amounts
                 </Text>
               </View>
               <View className="flex-row items-start gap-3">
-                <MaterialIcons name="backup" size={16} color={colors.primary} style={{ marginTop: 2 }} />
+                <MaterialIcons name="backup" size={16} color={colors.primary} className="mt-0.5" />
                 <Text className="flex-1">
                   Keep your recovery phrase safe and secure
                 </Text>

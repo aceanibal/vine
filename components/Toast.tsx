@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { View, Text, TouchableOpacity, Animated, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Animated } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '~/lib/useColorScheme';
 
@@ -69,56 +69,23 @@ export function Toast({
 
   return (
     <Animated.View 
-      style={[
-        styles.container,
-        { 
-          backgroundColor: getBackgroundColor(),
-          opacity: fadeAnim,
-          transform: [{
-            translateY: fadeAnim.interpolate({
-              inputRange: [0, 1],
-              outputRange: [-50, 0],
-            }),
-          }],
-        }
-      ]}
+      className="absolute top-15 left-5 right-5 flex-row items-center px-4 py-3 rounded-lg shadow-lg z-50"
+      style={{ 
+        backgroundColor: getBackgroundColor(),
+        opacity: fadeAnim,
+        transform: [{
+          translateY: fadeAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [-50, 0],
+          }),
+        }],
+      }}
     >
       <MaterialIcons name={getIconName()} size={20} color="white" />
-      <Text style={styles.message}>{message}</Text>
-      <TouchableOpacity onPress={hideToast} style={styles.closeButton}>
+      <Text className="flex-1 text-white text-sm font-medium ml-3">{message}</Text>
+      <TouchableOpacity onPress={hideToast} className="ml-2 p-1">
         <MaterialIcons name="close" size={20} color="white" />
       </TouchableOpacity>
     </Animated.View>
   );
-}
-
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    top: 60,
-    left: 20,
-    right: 20,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderRadius: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-    zIndex: 1000,
-  },
-  message: {
-    flex: 1,
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '500',
-    marginLeft: 12,
-  },
-  closeButton: {
-    marginLeft: 8,
-    padding: 4,
-  },
-}); 
+} 

@@ -1,5 +1,5 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { Modal, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '~/lib/useColorScheme';
 
@@ -44,6 +44,15 @@ export function CustomModal({
     }
   };
 
+  const getConfirmButtonClass = () => {
+    switch (type) {
+      case 'success': return 'bg-emerald-500';
+      case 'error': return 'bg-red-500';
+      case 'warning': return 'bg-amber-500';
+      default: return 'bg-blue-500';
+    }
+  };
+
   return (
     <Modal
       visible={visible}
@@ -51,44 +60,52 @@ export function CustomModal({
       animationType="fade"
       onRequestClose={onCancel || onClose}
     >
-      <View style={styles.overlay}>
-        <View style={[styles.modal, { backgroundColor: colors.card }]}>
-          <View style={styles.header}>
+      <View className="flex-1 bg-black/50 justify-center items-center p-5">
+        <View 
+          className="w-full max-w-md rounded-xl p-6 shadow-lg" 
+          style={{ backgroundColor: colors.card }}
+        >
+          <View className="flex-row items-center mb-4">
             <MaterialIcons 
               name={getIconName()} 
               size={24} 
               color={getIconColor()} 
             />
-            <Text style={[styles.title, { color: colors.foreground }]}>
+            <Text 
+              className="text-lg font-semibold ml-3" 
+              style={{ color: colors.foreground }}
+            >
               {title}
             </Text>
           </View>
           
-          <Text style={[styles.message, { color: colors.grey }]}>
+          <Text 
+            className="text-base leading-6 mb-6" 
+            style={{ color: colors.grey }}
+          >
             {message}
           </Text>
           
-          <View style={styles.actions}>
+          <View className="flex-row justify-end gap-3">
             {(onCancel || (showCancel && onClose)) && (
               <TouchableOpacity
-                style={[styles.button, styles.cancelButton]}
+                className="px-5 py-3 rounded-lg min-w-20 items-center bg-transparent"
                 onPress={onCancel || onClose}
               >
-                <Text style={[styles.buttonText, { color: colors.grey }]}>
+                <Text 
+                  className="text-base font-medium" 
+                  style={{ color: colors.grey }}
+                >
                   Cancel
                 </Text>
               </TouchableOpacity>
             )}
             
             <TouchableOpacity
-              style={[
-                styles.button, 
-                styles.confirmButton, 
-                { backgroundColor: getIconColor() }
-              ]}
+              className={`px-5 py-3 rounded-lg min-w-20 items-center ${getConfirmButtonClass()}`}
               onPress={onConfirm}
             >
-              <Text style={[styles.buttonText, { color: 'white' }]}>
+              <Text className="text-base font-medium text-white">
                 Confirm
               </Text>
             </TouchableOpacity>
@@ -97,62 +114,4 @@ export function CustomModal({
       </View>
     </Modal>
   );
-}
-
-const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: 20,
-  },
-  modal: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: 12,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 5,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 16,
-  },
-  title: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginLeft: 12,
-  },
-  message: {
-    fontSize: 16,
-    lineHeight: 24,
-    marginBottom: 24,
-  },
-  actions: {
-    flexDirection: 'row',
-    justifyContent: 'flex-end',
-    gap: 12,
-  },
-  button: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    borderRadius: 8,
-    minWidth: 80,
-    alignItems: 'center',
-  },
-  cancelButton: {
-    backgroundColor: 'transparent',
-  },
-  confirmButton: {
-    // backgroundColor set dynamically
-  },
-  buttonText: {
-    fontSize: 16,
-    fontWeight: '500',
-  },
-}); 
+} 
