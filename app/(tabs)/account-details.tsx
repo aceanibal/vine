@@ -3,21 +3,23 @@ import { router } from 'expo-router';
 import { View, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
+import * as Clipboard from 'expo-clipboard';
 
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { WalletStorage } from '~/lib/walletStorage';
-import { PREDEFINED_TOKENS, calculateTotalNetAssetValue, getTokenById } from '~/lib/tokens';
+import { PREDEFINED_TOKENS, calculateTotalNetAssetValue, getTokenById, createLiveTokenData } from '~/lib/tokens';
 import { MOCK_TRANSACTIONS } from '~/lib/transactions';
+import { balanceService, WalletBalances } from '~/lib/balanceService';
+import { CustomModal } from '~/components/CustomModal';
+import { ErrorModalConfig, ErrorSeverity } from '~/lib/blockchainErrorHandler';
 
 export default function AccountDetailsScreen() {
   const { colors } = useColorScheme();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [holdings, setHoldings] = useState<{ [key: string]: number }>({
-    gold: 0.5,
-    usd: 1000,
-    'digital-gas': 250
-  });
+  const [modalConfig, setModalConfig] = useState<ErrorModalConfig | null>(null);
+  const [balances, setBalances] = useState<WalletBalances | null>(null);
+  const [isLoadingBalances, setIsLoadingBalances] = useState(false);
 
   useEffect(() => {
     loadWallet();
@@ -27,8 +29,55 @@ export default function AccountDetailsScreen() {
     try {
       const address = await WalletStorage.getWalletAddress();
       setWalletAddress(address);
+      
+      // Load live balances if wallet exists
+      if (address) {
+        await loadBalances();
+      }
     } catch (error) {
       console.error('Failed to load wallet:', error);
+    }
+  };
+
+  const loadBalances = async () => {
+    try {
+      setIsLoadingBalances(true);
+      console.log('Loading live balances for account details...');
+      const liveBalances = await balanceService.getLiveBalances();
+      setBalances(liveBalances);
+      console.log('Live balances loaded for account details:', liveBalances);
+    } catch (error) {
+      console.error('Failed to load balances in account details:', error);
+    } finally {
+      setIsLoadingBalances(false);
+    }
+  };
+
+  const copyAddressToClipboard = async () => {
+    if (walletAddress) {
+      try {
+        await Clipboard.setStringAsync(walletAddress);
+        setModalConfig({
+          title: 'Address Copied!',
+          message: 'Your wallet address has been copied to the clipboard.',
+          severity: ErrorSeverity.LOW,
+          primaryAction: {
+            label: 'OK',
+            action: () => setModalConfig(null)
+          }
+        });
+      } catch (error) {
+        console.error('Failed to copy to clipboard:', error);
+        setModalConfig({
+          title: 'Copy Failed',
+          message: 'Failed to copy address to clipboard. Please try again.',
+          severity: ErrorSeverity.MEDIUM,
+          primaryAction: {
+            label: 'OK',
+            action: () => setModalConfig(null)
+          }
+        });
+      }
     }
   };
 
@@ -54,7 +103,9 @@ export default function AccountDetailsScreen() {
     return num.toFixed(2);
   };
 
-  const totalNetAssetValue = calculateTotalNetAssetValue(holdings);
+  // Calculate total net asset value from live balances using single source of truth
+  const liveTokens = createLiveTokenData(balances);
+  const totalNetAssetValue = liveTokens.reduce((total, token) => total + token.value, 0);
   const totalTransactions = MOCK_TRANSACTIONS.length;
   const accountAge = '2 months'; // Mock data
 
@@ -90,9 +141,17 @@ export default function AccountDetailsScreen() {
                 <Text className="text-muted-foreground">
                   Wallet Address
                 </Text>
-                <Text className="font-mono">
-                  {walletAddress ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}` : 'Loading...'}
-                </Text>
+                <TouchableOpacity 
+                  onPress={copyAddressToClipboard}
+                  className="flex-row items-center gap-2"
+                >
+                  <Text className="font-mono">
+                    {walletAddress ? `${walletAddress.slice(0, 8)}...${walletAddress.slice(-6)}` : 'Loading...'}
+                  </Text>
+                  {walletAddress && (
+                    <MaterialIcons name="content-copy" size={16} color={colors.primary} />
+                  )}
+                </TouchableOpacity>
               </View>
               <View className="flex-row items-center justify-between">
                 <Text className="text-muted-foreground">
@@ -119,10 +178,8 @@ export default function AccountDetailsScreen() {
               Holdings Breakdown
             </Text>
             <View className="gap-3">
-              {PREDEFINED_TOKENS.map((token) => {
-                const holding = holdings[token.id] || 0;
-                const value = holding * token.price;
-                const percentage = totalNetAssetValue > 0 ? (value / totalNetAssetValue) * 100 : 0;
+              {liveTokens.length > 0 ? liveTokens.map((token) => {
+                const percentage = totalNetAssetValue > 0 ? (token.value / totalNetAssetValue) * 100 : 0;
                 
                 return (
                   <View key={token.id} className="flex-row items-center justify-between">
@@ -142,13 +199,13 @@ export default function AccountDetailsScreen() {
                           {token.name}
                         </Text>
                         <Text className="text-xs text-muted-foreground">
-                          {holding.toFixed(2)} {token.symbol}
+                          {token.formattedBalance}
                         </Text>
                       </View>
                     </View>
                     <View className="items-end">
                       <Text className="font-semibold">
-                        {formatCurrency(value)}
+                        {formatCurrency(token.value)}
                       </Text>
                       <Text className="text-xs text-muted-foreground">
                         {percentage.toFixed(2)}%
@@ -156,7 +213,24 @@ export default function AccountDetailsScreen() {
                     </View>
                   </View>
                 );
-              })}
+              }) : (
+                // Loading state
+                [1, 2, 3].map((i) => (
+                  <View key={i} className="flex-row items-center justify-between">
+                    <View className="flex-row items-center gap-3">
+                      <View className="w-8 h-8 rounded-full bg-gray-200" />
+                      <View>
+                        <View className="w-16 h-4 bg-gray-200 rounded mb-1" />
+                        <View className="w-12 h-3 bg-gray-200 rounded" />
+                      </View>
+                    </View>
+                    <View className="items-end">
+                      <View className="w-16 h-4 bg-gray-200 rounded mb-1" />
+                      <View className="w-8 h-3 bg-gray-200 rounded" />
+                    </View>
+                  </View>
+                ))
+              )}
             </View>
           </View>
 
@@ -194,6 +268,19 @@ export default function AccountDetailsScreen() {
           </View>
         </View>
       </ScrollView>
+
+      {/* Custom Modal for feedback */}
+      {modalConfig && (
+        <CustomModal
+          isVisible={true}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          severity={modalConfig.severity}
+          primaryAction={modalConfig.primaryAction}
+          secondaryAction={modalConfig.secondaryAction}
+          onClose={() => setModalConfig(null)}
+        />
+      )}
     </SafeAreaView>
   );
 } 

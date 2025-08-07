@@ -56,9 +56,12 @@ export const SUPPORTED_NETWORKS: Record<string, NetworkConfig> = {
     name: 'Polygon',
     symbol: 'MATIC',
     rpcUrls: [
+      'https://polygon-rpc.com',
+      'https://rpc-mainnet.matic.network',
+      'https://matic-mainnet.chainstacklabs.com',
+      'https://rpc-mainnet.maticvigil.com',
       'https://polygon-mainnet.infura.io/v3/YOUR_INFURA_KEY',
-      'https://polygon-mainnet.g.alchemy.com/v2/YOUR_ALCHEMY_KEY',
-      'https://polygon-rpc.com'
+      'https://polygon-mainnet.g.alchemy.com/v2/YOUR_ALCHEMY_KEY'
     ],
     blockExplorerUrls: ['https://polygonscan.com'],
     decimals: 18,
@@ -311,9 +314,9 @@ export class BlockchainService {
       console.warn('Failed to get fee data, falling back to gas price:', error);
     }
 
-    // Fallback to legacy gas price
-    const gasPrice = await this.provider.getGasPrice();
-    return { gasPrice: gasPrice.toString() };
+    // Fallback to legacy gas price using getFeeData
+    const feeData = await this.provider.getFeeData();
+    return { gasPrice: feeData.gasPrice?.toString() || '0' };
   }
 
   /**
@@ -541,7 +544,7 @@ export class BlockchainService {
         gasPrice: receipt.gasPrice?.toString(),
         blockNumber: receipt.blockNumber,
         confirmations: confirmations,
-        status: receipt.status
+        status: receipt.status ?? undefined
       };
     } catch (error) {
       console.error('Failed to wait for transaction:', error);
@@ -579,7 +582,7 @@ export class BlockchainService {
         gasPrice: transaction.gasPrice?.toString(),
         blockNumber: receipt?.blockNumber,
         confirmations,
-        status: receipt?.status
+        status: receipt?.status ?? undefined
       };
     } catch (error) {
       console.error('Failed to get transaction:', error);

@@ -18,6 +18,7 @@ import { WalletStorage } from '~/lib/walletStorage';
 import { BlockchainUtils } from '~/lib/blockchainUtils';
 import { BlockchainErrorHandler } from '~/lib/blockchainErrorHandler';
 import { CustomModal } from '~/components/CustomModal';
+import { ErrorModalConfig, ErrorSeverity } from '~/lib/blockchainErrorHandler';
 
 const ROOT_STYLE = { flex: 1 };
 
@@ -26,7 +27,7 @@ export default function CreateWalletScreen() {
   const [mnemonic, setMnemonic] = useState<string>('');
   const [hasConfirmed, setHasConfirmed] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [modalConfig, setModalConfig] = useState(null);
+  const [modalConfig, setModalConfig] = useState<ErrorModalConfig | null>(null);
 
   console.log('CreateWalletScreen rendered');
 
@@ -57,7 +58,7 @@ export default function CreateWalletScreen() {
       setModalConfig({
         title: 'Write Down Your Phrase',
         message: 'Please make sure you have written down your 12-word recovery phrase before continuing.',
-        severity: 'medium',
+        severity: ErrorSeverity.MEDIUM,
         primaryAction: {
           label: 'I\'ve Written It Down',
           action: () => {
@@ -92,7 +93,7 @@ export default function CreateWalletScreen() {
       setModalConfig({
         title: 'Wallet Created Successfully!',
         message: `Your wallet has been created and securely stored.\n\nAddress: ${formattedAddress}`,
-        severity: 'low',
+        severity: ErrorSeverity.LOW,
         primaryAction: {
           label: 'Continue',
           action: () => {

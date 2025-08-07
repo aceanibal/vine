@@ -1,25 +1,26 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { View, ScrollView, TouchableOpacity } from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
+import * as Haptics from 'expo-haptics';
 
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { WalletStorage } from '~/lib/walletStorage';
-import { PREDEFINED_TOKENS, calculateTotalNetAssetValue, getTokenById } from '~/lib/tokens';
+import { PREDEFINED_TOKENS, calculateTotalNetAssetValue, getTokenById, createLiveTokenData } from '~/lib/tokens';
 import { MOCK_TRANSACTIONS, getTransactionIcon, getTransactionColor, getTransactionTitle, formatTimeAgo } from '~/lib/transactions';
+import { balanceService, WalletBalances } from '~/lib/balanceService';
 
 export default function DashboardScreen() {
   const { colors } = useColorScheme();
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [holdings, setHoldings] = useState<{ [key: string]: number }>({
-    gold: 0.5,
-    usd: 1000,
-    'digital-gas': 250
-  });
+  const [balances, setBalances] = useState<WalletBalances | null>(null);
+  const [isLoadingBalances, setIsLoadingBalances] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
 
   useEffect(() => {
     loadWallet();
@@ -29,10 +30,59 @@ export default function DashboardScreen() {
     try {
       const address = await WalletStorage.getWalletAddress();
       setWalletAddress(address);
+      
+      // Load live balances if wallet exists
+      if (address) {
+        await loadBalances();
+      }
     } catch (error) {
       console.error('Failed to load wallet:', error);
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const loadBalances = async (fromRefresh = false) => {
+    try {
+      if (!fromRefresh) {
+        setIsLoadingBalances(true);
+      }
+      console.log('Loading live balances...');
+      const liveBalances = await balanceService.getLiveBalances();
+      setBalances(liveBalances);
+      setLastUpdated(new Date());
+      console.log('Live balances loaded successfully:', liveBalances);
+    } catch (error) {
+      console.error('Failed to load balances:', error);
+      // Keep balances as null to show loading or error state
+    } finally {
+      if (!fromRefresh) {
+        setIsLoadingBalances(false);
+      }
+    }
+  };
+
+  const onRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      console.log('Pull-to-refresh: Refreshing balances...');
+      
+      // Add haptic feedback for better user experience
+      await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      
+      // Reload balances from blockchain
+      await loadBalances(true);
+      
+      // Success haptic feedback
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      
+      console.log('Pull-to-refresh: Balances refreshed successfully');
+    } catch (error) {
+      console.error('Pull-to-refresh: Failed to refresh balances:', error);
+      // Error haptic feedback
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -62,7 +112,28 @@ export default function DashboardScreen() {
     return num.toFixed(2);
   };
 
-  const totalNetAssetValue = calculateTotalNetAssetValue(holdings);
+  const formatLastUpdated = (date: Date | null) => {
+    if (!date) return '';
+    
+    const now = new Date();
+    const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+    
+    if (diffInSeconds < 60) {
+      return 'Just now';
+    } else if (diffInSeconds < 3600) {
+      const minutes = Math.floor(diffInSeconds / 60);
+      return `${minutes}m ago`;
+    } else if (diffInSeconds < 86400) {
+      const hours = Math.floor(diffInSeconds / 3600);
+      return `${hours}h ago`;
+    } else {
+      return date.toLocaleDateString();
+    }
+  };
+
+  // Calculate total net asset value from live balances using single source of truth
+  const liveTokens = createLiveTokenData(balances);
+  const totalNetAssetValue = liveTokens.reduce((total, token) => total + token.value, 0);
 
   if (isLoading) {
     return (
@@ -103,7 +174,19 @@ export default function DashboardScreen() {
         </Text>
         <View className="w-6" />
       </View>
-      <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">
+      <ScrollView 
+        className="flex-1 bg-gray-50" 
+        contentContainerClassName="p-4"
+        refreshControl={
+          <RefreshControl
+            refreshing={isRefreshing}
+            onRefresh={onRefresh}
+            tintColor={colors.primary}
+            colors={[colors.primary]}
+            progressBackgroundColor={colors.background}
+          />
+        }
+      >
         <View className="gap-6">
 
           {/* Total Net Asset Value */}
@@ -129,13 +212,32 @@ export default function DashboardScreen() {
 
           {/* Assets List */}
           <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="text-lg font-semibold">
-              Your Assets
-            </Text>
+            <View className="flex-row items-center justify-between">
+              <Text className="text-lg font-semibold">
+                Your Assets
+              </Text>
+              <TouchableOpacity 
+                onPress={() => loadBalances(false)}
+                disabled={isLoadingBalances || isRefreshing}
+                className="flex-row items-center gap-1"
+              >
+                <MaterialIcons 
+                  name="refresh" 
+                  size={16} 
+                  color={(isLoadingBalances || isRefreshing) ? colors.grey : colors.primary} 
+                />
+                <Text className="text-xs text-primary font-medium">
+                  {(isLoadingBalances || isRefreshing) ? 'Loading...' : 'Refresh'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {lastUpdated && (
+              <Text className="text-xs text-muted-foreground text-center">
+                Last updated {formatLastUpdated(lastUpdated)}
+              </Text>
+            )}
             <View className="gap-3">
-              {PREDEFINED_TOKENS.map((token) => {
-                const holding = holdings[token.id] || 0;
-                const value = holding * token.price;
+              {liveTokens.length > 0 ? liveTokens.map((token) => {
                 const priceChangeColor = token.priceChange24h >= 0 ? '#4CAF50' : '#F44336';
                 
                 return (
@@ -169,13 +271,13 @@ export default function DashboardScreen() {
                           {token.name}
                         </Text>
                         <Text className="text-xs text-muted-foreground">
-                          {holding.toFixed(2)} {token.symbol}
+                          {token.formattedBalance}
                         </Text>
                       </View>
                     </View>
                     <View className="items-end">
                       <Text className="text-base font-semibold">
-                        {formatCurrency(value)}
+                        {formatCurrency(token.value)}
                       </Text>
                       <View className="flex-row items-center gap-1">
                         <MaterialIcons 
@@ -187,13 +289,37 @@ export default function DashboardScreen() {
                           className="text-xs"
                           style={{ color: priceChangeColor }}
                         >
-                          {token.priceChange24h >= 0 ? '+' : ''}{token.priceChange24h.toFixed(2)}%
+                          {token.priceChange24h >= 0 ? '+' : ''}{token.priceChange24h.toFixed(1)}%
                         </Text>
                       </View>
                     </View>
                   </TouchableOpacity>
                 );
-              })}
+              }) : (
+                // Loading state or hint
+                isLoadingBalances || isRefreshing ? [1, 2, 3].map((i) => (
+                  <View key={i} className="flex-row items-center justify-between rounded-lg border border-border bg-background p-4">
+                    <View className="flex-row items-center gap-3">
+                      <View className="w-10 h-10 rounded-full bg-gray-200" />
+                      <View>
+                        <View className="w-20 h-4 bg-gray-200 rounded mb-1" />
+                        <View className="w-16 h-3 bg-gray-200 rounded" />
+                      </View>
+                    </View>
+                    <View className="items-end">
+                      <View className="w-16 h-4 bg-gray-200 rounded mb-1" />
+                      <View className="w-12 h-3 bg-gray-200 rounded" />
+                    </View>
+                  </View>
+                )) : (
+                  <View className="items-center justify-center py-8">
+                    <MaterialIcons name="refresh" size={32} color={colors.grey} />
+                    <Text className="mt-2 text-center text-muted-foreground">
+                      Pull down to refresh balances
+                    </Text>
+                  </View>
+                )
+              )}
             </View>
           </View>
 

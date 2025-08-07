@@ -18,6 +18,7 @@ import { WalletStorage } from '~/lib/walletStorage';
 import { BlockchainUtils } from '~/lib/blockchainUtils';
 import { BlockchainErrorHandler } from '~/lib/blockchainErrorHandler';
 import { CustomModal } from '~/components/CustomModal';
+import { ErrorModalConfig, ErrorSeverity } from '~/lib/blockchainErrorHandler';
 
 const ROOT_STYLE = { flex: 1 };
 
@@ -26,6 +27,14 @@ export default function ImportWalletScreen() {
   const [mnemonic, setMnemonic] = useState<string>('');
   const [isImporting, setIsImporting] = useState(false);
   const [isValidMnemonic, setIsValidMnemonic] = useState(false);
+  const [modalConfig, setModalConfig] = useState<ErrorModalConfig | null>(null);
+
+  useEffect(() => {
+    // Set up error handler callbacks for custom modals
+    BlockchainErrorHandler.setErrorModalCallback((config) => {
+      setModalConfig(config);
+    });
+  }, []);
 
   const validateMnemonic = (phrase: string) => {
     try {
@@ -46,11 +55,15 @@ export default function ImportWalletScreen() {
 
   const handleImportWallet = async () => {
     if (!isValidMnemonic) {
-      Alert.alert(
-        'Invalid Recovery Phrase',
-        'Please enter a valid 12-word recovery phrase.',
-        [{ text: 'OK' }]
-      );
+      setModalConfig({
+        title: 'Invalid Recovery Phrase',
+        message: 'Please enter a valid 12-word recovery phrase.',
+        severity: ErrorSeverity.HIGH,
+        primaryAction: {
+          label: 'OK',
+          action: () => setModalConfig(null)
+        }
+      });
       return;
     }
 
@@ -63,23 +76,25 @@ export default function ImportWalletScreen() {
       // Save wallet to secure storage
       await WalletStorage.saveWallet(wallet as any, mnemonic.trim());
       
-      Alert.alert(
-        'Wallet Imported Successfully!',
-        `Your wallet has been imported and securely stored.\n\nAddress: ${wallet.address.slice(0, 10)}...${wallet.address.slice(-8)}`,
-        [
-          { 
-            text: 'Continue', 
-            onPress: () => router.replace('/(tabs)/dashboard' as any)
+      // Format address for display using utility
+      const formattedAddress = BlockchainUtils.Address.formatAddressForDisplay(wallet.address);
+      setModalConfig({
+        title: 'Wallet Imported Successfully!',
+        message: `Your wallet has been imported and securely stored.\n\nAddress: ${formattedAddress}`,
+        severity: ErrorSeverity.LOW,
+        primaryAction: {
+          label: 'Continue',
+          action: () => {
+            setModalConfig(null);
+            router.replace('/(tabs)/dashboard' as any);
           }
-        ]
-      );
+        }
+      });
     } catch (error) {
       console.error('Failed to import wallet:', error);
-      Alert.alert(
-        'Error',
-        'Failed to import wallet. Please check your recovery phrase and try again.',
-        [{ text: 'OK' }]
-      );
+      
+      // Use error handler for consistent error display
+      BlockchainErrorHandler.handleError(error, 'Wallet Import');
     } finally {
       setIsImporting(false);
     }
@@ -198,6 +213,19 @@ export default function ImportWalletScreen() {
           </Button>
         </View>
       </View>
+
+      {/* Custom Modal for user-friendly error handling */}
+      {modalConfig && (
+        <CustomModal
+          visible={!!modalConfig}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          severity={modalConfig.severity}
+          primaryAction={modalConfig.primaryAction}
+          secondaryAction={modalConfig.secondaryAction}
+          onClose={() => setModalConfig(null)}
+        />
+      )}
     </SafeAreaView>
   );
 } 

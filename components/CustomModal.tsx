@@ -2,31 +2,53 @@ import React from 'react';
 import { Modal, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '~/lib/useColorScheme';
+import { ErrorSeverity } from '~/lib/blockchainErrorHandler';
 
 interface CustomModalProps {
   visible: boolean;
   title: string;
   message: string;
-  type: 'success' | 'error' | 'info' | 'warning';
-  onConfirm: () => void;
+  type?: 'success' | 'error' | 'info' | 'warning';
+  severity?: ErrorSeverity;
+  onConfirm?: () => void;
   onCancel?: () => void;
   onClose?: () => void;
   showCancel?: boolean;
+  primaryAction?: {
+    label: string;
+    action: () => void;
+  };
+  secondaryAction?: {
+    label: string;
+    action: () => void;
+  };
 }
 
 export function CustomModal({ 
   visible, 
   title, 
   message, 
-  type, 
+  type,
+  severity,
   onConfirm, 
   onCancel,
   onClose,
-  showCancel = false
+  showCancel = false,
+  primaryAction,
+  secondaryAction
 }: CustomModalProps) {
   const { colors } = useColorScheme();
 
   const getIconName = () => {
+    if (severity) {
+      switch (severity) {
+        case ErrorSeverity.CRITICAL: return 'error';
+        case ErrorSeverity.HIGH: return 'warning';
+        case ErrorSeverity.MEDIUM: return 'info';
+        case ErrorSeverity.LOW: return 'check-circle';
+        default: return 'info';
+      }
+    }
     switch (type) {
       case 'success': return 'check-circle';
       case 'error': return 'error';
@@ -36,6 +58,15 @@ export function CustomModal({
   };
 
   const getIconColor = () => {
+    if (severity) {
+      switch (severity) {
+        case ErrorSeverity.CRITICAL: return '#EF4444';
+        case ErrorSeverity.HIGH: return '#F59E0B';
+        case ErrorSeverity.MEDIUM: return '#3B82F6';
+        case ErrorSeverity.LOW: return '#10B981';
+        default: return '#3B82F6';
+      }
+    }
     switch (type) {
       case 'success': return '#10B981';
       case 'error': return '#EF4444';
@@ -45,6 +76,15 @@ export function CustomModal({
   };
 
   const getConfirmButtonClass = () => {
+    if (severity) {
+      switch (severity) {
+        case ErrorSeverity.CRITICAL: return 'bg-red-500';
+        case ErrorSeverity.HIGH: return 'bg-amber-500';
+        case ErrorSeverity.MEDIUM: return 'bg-blue-500';
+        case ErrorSeverity.LOW: return 'bg-emerald-500';
+        default: return 'bg-blue-500';
+      }
+    }
     switch (type) {
       case 'success': return 'bg-emerald-500';
       case 'error': return 'bg-red-500';
@@ -87,26 +127,26 @@ export function CustomModal({
           </Text>
           
           <View className="flex-row justify-end gap-3">
-            {(onCancel || (showCancel && onClose)) && (
+            {(secondaryAction || onCancel || (showCancel && onClose)) && (
               <TouchableOpacity
                 className="px-5 py-3 rounded-lg min-w-20 items-center bg-transparent"
-                onPress={onCancel || onClose}
+                onPress={secondaryAction?.action || onCancel || onClose}
               >
                 <Text 
                   className="text-base font-medium" 
                   style={{ color: colors.grey }}
                 >
-                  Cancel
+                  {secondaryAction?.label || 'Cancel'}
                 </Text>
               </TouchableOpacity>
             )}
             
             <TouchableOpacity
               className={`px-5 py-3 rounded-lg min-w-20 items-center ${getConfirmButtonClass()}`}
-              onPress={onConfirm}
+              onPress={primaryAction?.action || onConfirm}
             >
               <Text className="text-base font-medium text-white">
-                Confirm
+                {primaryAction?.label || 'Confirm'}
               </Text>
             </TouchableOpacity>
           </View>
