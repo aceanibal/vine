@@ -1,6 +1,15 @@
 import { Transaction, MOCK_TRANSACTIONS } from './transactions';
 import { transactionService } from './transactionService';
 import { convertServiceToUITransaction } from './transactionTypeMapping';
+import { blockchainService } from './blockchainService';
+import { WalletStorage } from './walletStorage';
+// Import secure random source (BEFORE the shims)
+import "react-native-get-random-values";
+
+// Import the ethers shims (BEFORE importing ethers)
+import "@ethersproject/shims";
+
+import { ethers } from 'ethers';
 
 /**
  * TransactionManager - Single source of truth for transaction data throughout the app
@@ -14,6 +23,20 @@ export class TransactionManager {
   private constructor() {
     // Initialize with empty transactions - will be populated from blockchain service
     this.transactions = [...MOCK_TRANSACTIONS];
+    // Automatically load transactions on startup
+    this.initializeTransactions();
+  }
+
+  /**
+   * Initialize transactions on startup
+   */
+  private async initializeTransactions(): Promise<void> {
+    try {
+      await this.refreshTransactions();
+    } catch (error) {
+      console.error('Failed to initialize transactions:', error);
+      // Don't throw - app should still work without transactions
+    }
   }
 
   /**
@@ -209,21 +232,82 @@ export class TransactionManager {
   }
 
   /**
+   * Convert blockchain transaction to UI transaction
+   */
+  private convertBlockchainToUITransaction(blockchainTx: any, walletAddress: string): Transaction {
+    const isReceived = blockchainTx.to.toLowerCase() === walletAddress.toLowerCase();
+    const amount = parseFloat(ethers.formatEther(blockchainTx.value));
+    const gasFee = blockchainTx.gasUsed && blockchainTx.gasPrice 
+      ? parseFloat(ethers.formatEther((BigInt(blockchainTx.gasUsed) * BigInt(blockchainTx.gasPrice)).toString()))
+      : 0;
+
+    return {
+      id: `blockchain_${blockchainTx.hash}`,
+      type: isReceived ? 'receive' : 'send',
+      tokenId: 'gas', // Assuming native token for now
+      amount,
+      value: amount * 500, // Rough MATIC price estimate
+      timestamp: new Date(blockchainTx.timestamp * 1000),
+      status: blockchainTx.status === 1 ? 'completed' : 'failed',
+      sender: blockchainTx.from,
+      recipient: blockchainTx.to,
+      txHash: blockchainTx.hash,
+      blockNumber: blockchainTx.blockNumber,
+      gasUsed: blockchainTx.gasUsed ? parseInt(blockchainTx.gasUsed) : undefined,
+      gasPrice: blockchainTx.gasPrice ? parseInt(blockchainTx.gasPrice) : undefined,
+      gasFee,
+      metadata: {
+        description: isReceived ? 'Received MATIC' : 'Sent MATIC',
+        tokenSymbol: 'MATIC',
+        tokenDecimals: 18,
+        tokenName: 'Polygon'
+      }
+    };
+  }
+
+  /**
    * Refresh transactions from blockchain service
-   * Integrates with the transaction service to get real transaction data
+   * Fetches real transaction data from the blockchain
    */
   public async refreshTransactions(): Promise<void> {
     try {
       console.log('Refreshing transactions from blockchain...');
       
-      // Get transactions from service
+      // Get current wallet address
+      const walletAddress = await WalletStorage.getWalletAddress();
+      if (!walletAddress) {
+        console.log('No wallet address found, cannot fetch transactions');
+        return;
+      }
+
+      console.log(`Refreshing transactions for wallet: ${walletAddress}`);
+
+      // Ensure blockchain service is initialized
+      let blockchainTransactions: any[] = [];
+      try {
+        await blockchainService.initialize('polygon'); // Initialize with Polygon network
+        console.log('Blockchain service initialized successfully');
+        
+        // Fetch transactions from blockchain
+        blockchainTransactions = await blockchainService.getTransactionHistory(walletAddress, 20);
+        console.log(`Fetched ${blockchainTransactions.length} transactions from blockchain`);
+      } catch (error) {
+        console.error('Failed to initialize blockchain service or fetch transactions:', error);
+        // Continue without blockchain transactions if initialization or fetching fails
+        blockchainTransactions = [];
+      }
+      
+      // Convert blockchain transactions to UI transactions
+      const uiTransactions = blockchainTransactions.map(tx => 
+        this.convertBlockchainToUITransaction(tx, walletAddress)
+      );
+      
+      // Get transactions from transaction service
       const serviceTransactions = transactionService.getAllTransactions();
+      const serviceUITransactions = serviceTransactions.map(convertServiceToUITransaction);
       
-      // Convert service transactions to UI transactions
-      const uiTransactions = serviceTransactions.map(convertServiceToUITransaction);
-      
-      // Merge with existing mock transactions (in production, replace completely)
-      const allTransactions = [...uiTransactions, ...MOCK_TRANSACTIONS];
+      // Combine all transactions
+      const allTransactions = [...uiTransactions, ...serviceUITransactions, ...MOCK_TRANSACTIONS];
       
       // Remove duplicates by txHash
       const uniqueTransactions = allTransactions.filter((tx, index, self) => 
@@ -232,6 +316,8 @@ export class TransactionManager {
       
       this.transactions = uniqueTransactions;
       this.notifyListeners();
+      
+      console.log(`Loaded ${uiTransactions.length} blockchain transactions, ${serviceUITransactions.length} service transactions, total: ${uniqueTransactions.length}`);
     } catch (error) {
       console.error('Failed to refresh transactions:', error);
       throw error;

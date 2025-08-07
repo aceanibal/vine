@@ -53,6 +53,14 @@ export default function DashboardScreen() {
       setBalances(liveBalances);
       setLastUpdated(new Date());
       console.log('Live balances loaded successfully:', liveBalances);
+      
+      // Also refresh transactions when loading balances
+      try {
+        await transactionManager.refreshTransactions();
+        console.log('Transactions refreshed successfully');
+      } catch (error) {
+        console.error('Failed to refresh transactions:', error);
+      }
     } catch (error) {
       console.error('Failed to load balances:', error);
       // Keep balances as null to show loading or error state

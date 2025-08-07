@@ -14,9 +14,22 @@ import { transactionManager } from '~/lib/transactionManager';
 export default function TransactionsScreen() {
   const { colors } = useColorScheme();
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'send' | 'receive' | 'swap' | 'stake' | 'defi' | 'nft' | 'failed' | 'gas'>('all');
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   // Use transaction manager as single source of truth
   const filteredTransactions = transactionManager.getTransactionsByType(selectedFilter);
+
+  const handleRefresh = async () => {
+    try {
+      setIsRefreshing(true);
+      await transactionManager.refreshTransactions();
+      console.log('Transactions refreshed successfully');
+    } catch (error) {
+      console.error('Failed to refresh transactions:', error);
+    } finally {
+      setIsRefreshing(false);
+    }
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -158,7 +171,13 @@ export default function TransactionsScreen() {
         <Text className="font-bold">
           Transactions
         </Text>
-        <View className="w-6" />
+        <TouchableOpacity onPress={handleRefresh} disabled={isRefreshing}>
+          <MaterialIcons 
+            name="refresh" 
+            size={24} 
+            color={isRefreshing ? colors.grey : colors.foreground} 
+          />
+        </TouchableOpacity>
       </View>
 
       <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">
