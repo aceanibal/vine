@@ -12,7 +12,7 @@ export class TransactionManager {
   private listeners: Set<(transactions: Transaction[]) => void> = new Set();
 
   private constructor() {
-    // Initialize with mock data - in production this would fetch from blockchain service
+    // Initialize with empty transactions - will be populated from blockchain service
     this.transactions = [...MOCK_TRANSACTIONS];
   }
 

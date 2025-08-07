@@ -117,7 +117,6 @@ export default function TransferScreen() {
                 // Enhanced display for gas token and metadata
                 const displaySymbol = transaction.metadata?.tokenSymbol || token?.symbol || '';
                 const description = transaction.metadata?.description;
-                const isGasTransaction = transaction.tokenId === 'gas';
 
                 return (
                   <View key={transaction.id} className="flex-row items-center justify-between py-2">
@@ -135,7 +134,6 @@ export default function TransferScreen() {
                       <View className="flex-1">
                         <Text className="text-sm">
                           {title} {displaySymbol}
-                          {isGasTransaction && <Text className="text-xs text-orange-600"> (Gas)</Text>}
                         </Text>
                         {description && (
                           <Text className="text-xs text-muted-foreground" numberOfLines={1}>
