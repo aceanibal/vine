@@ -7,16 +7,19 @@ import "@ethersproject/shims";
 import { MaterialIcons } from '@expo/vector-icons';
 import { ethers } from 'ethers';
 import { router } from 'expo-router';
-import { Platform, View, ScrollView, Alert, TextInput } from 'react-native';
+import { Platform, View, ScrollView, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { WalletStorage } from '~/lib/walletStorage';
+import { BlockchainUtils } from '~/lib/blockchainUtils';
+import { BlockchainErrorHandler } from '~/lib/blockchainErrorHandler';
+import { CustomModal } from '~/components/CustomModal';
 
-
+const ROOT_STYLE = { flex: 1 };
 
 export default function ImportWalletScreen() {
   const { colors } = useColorScheme();
@@ -89,7 +92,7 @@ export default function ImportWalletScreen() {
   const wordCount = mnemonic.trim().split(/\s+/).filter(word => word.length > 0).length;
 
   return (
-    <SafeAreaView className="flex-1">
+    <SafeAreaView style={ROOT_STYLE}>
       <View className="mx-auto max-w-sm flex-1 px-8 py-4">
         {/* Header */}
         <View className="flex-row items-center justify-between pb-6">

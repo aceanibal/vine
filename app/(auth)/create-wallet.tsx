@@ -7,7 +7,7 @@ import "@ethersproject/shims";
 import { MaterialIcons } from '@expo/vector-icons';
 import { ethers } from 'ethers';
 import { router } from 'expo-router';
-import { Platform, View, ScrollView, Alert } from 'react-native';
+import { Platform, View, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 
@@ -15,63 +15,97 @@ import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { WalletStorage } from '~/lib/walletStorage';
+import { BlockchainUtils } from '~/lib/blockchainUtils';
+import { BlockchainErrorHandler } from '~/lib/blockchainErrorHandler';
+import { CustomModal } from '~/components/CustomModal';
 
-
+const ROOT_STYLE = { flex: 1 };
 
 export default function CreateWalletScreen() {
   const { colors } = useColorScheme();
   const [mnemonic, setMnemonic] = useState<string>('');
   const [hasConfirmed, setHasConfirmed] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
+  const [modalConfig, setModalConfig] = useState(null);
 
   console.log('CreateWalletScreen rendered');
 
   useEffect(() => {
     console.log('CreateWalletScreen useEffect triggered');
-    // Generate a new mnemonic when component mounts
-    const newMnemonic = ethers.Wallet.createRandom().mnemonic?.phrase || '';
-    setMnemonic(newMnemonic);
+    
+    // Set up error handler callbacks for custom modals
+    BlockchainErrorHandler.setErrorModalCallback((config) => {
+      setModalConfig(config);
+    });
+
+    // Generate mnemonic using enhanced utility with validation
+    const newMnemonic = BlockchainUtils.Wallet.generateMnemonic();
+    
+    // Validate the generated mnemonic
+    if (BlockchainUtils.Wallet.isValidMnemonic(newMnemonic)) {
+      setMnemonic(newMnemonic);
+    } else {
+      // Fallback to ethers if utility fails
+      const fallbackMnemonic = ethers.Wallet.createRandom().mnemonic?.phrase || '';
+      setMnemonic(fallbackMnemonic);
+    }
   }, []);
 
   const handleCreateWallet = async () => {
     if (!hasConfirmed) {
-      Alert.alert(
-        'Write Down Your Phrase',
-        'Please make sure you have written down your 12-word recovery phrase before continuing.',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'I\'ve Written It Down', onPress: () => setHasConfirmed(true) }
-        ]
-      );
+      // Use custom modal instead of system alert
+      setModalConfig({
+        title: 'Write Down Your Phrase',
+        message: 'Please make sure you have written down your 12-word recovery phrase before continuing.',
+        severity: 'medium',
+        primaryAction: {
+          label: 'I\'ve Written It Down',
+          action: () => {
+            setHasConfirmed(true);
+            setModalConfig(null);
+          }
+        },
+        secondaryAction: {
+          label: 'Cancel',
+          action: () => setModalConfig(null)
+        }
+      });
       return;
     }
 
     setIsCreating(true);
     
     try {
+      // Validate mnemonic before wallet creation
+      if (!BlockchainUtils.Wallet.isValidMnemonic(mnemonic)) {
+        throw new Error('Invalid mnemonic phrase generated');
+      }
+
       // Create wallet from mnemonic
       const wallet = ethers.Wallet.fromPhrase(mnemonic);
       
       // Save wallet to secure storage
       await WalletStorage.saveWallet(wallet as any, mnemonic);
       
-      Alert.alert(
-        'Wallet Created Successfully!',
-        `Your wallet has been created and securely stored.\n\nAddress: ${wallet.address.slice(0, 10)}...${wallet.address.slice(-8)}`,
-        [
-          { 
-            text: 'Continue', 
-            onPress: () => router.replace('/(tabs)/dashboard' as any)
+      // Show success with custom modal and formatted address
+      const formattedAddress = BlockchainUtils.Address.formatAddressForDisplay(wallet.address);
+      setModalConfig({
+        title: 'Wallet Created Successfully!',
+        message: `Your wallet has been created and securely stored.\n\nAddress: ${formattedAddress}`,
+        severity: 'low',
+        primaryAction: {
+          label: 'Continue',
+          action: () => {
+            setModalConfig(null);
+            router.replace('/(tabs)/dashboard' as any);
           }
-        ]
-      );
+        }
+      });
     } catch (error) {
       console.error('Failed to create wallet:', error);
-      Alert.alert(
-        'Error',
-        'Failed to create wallet. Please try again.',
-        [{ text: 'OK' }]
-      );
+      
+      // Use error handler for consistent error display
+      BlockchainErrorHandler.handleError(error, 'Wallet Creation');
     } finally {
       setIsCreating(false);
     }
@@ -82,7 +116,7 @@ export default function CreateWalletScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1">
+    <SafeAreaView style={ROOT_STYLE}>
       <View className="mx-auto max-w-sm flex-1 px-8 py-4">
         {/* Header */}
         <View className="flex-row items-center justify-between pb-6">
@@ -97,7 +131,7 @@ export default function CreateWalletScreen() {
           <Text className="font-bold">
             Create Wallet
           </Text>
-          <View className="w-10" />
+          <View style={{ width: 40 }} />
         </View>
 
         <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
@@ -177,6 +211,19 @@ export default function CreateWalletScreen() {
           </Button>
         </View>
       </View>
+
+      {/* Custom Modal for user-friendly error handling */}
+      {modalConfig && (
+        <CustomModal
+          visible={!!modalConfig}
+          title={modalConfig.title}
+          message={modalConfig.message}
+          severity={modalConfig.severity}
+          primaryAction={modalConfig.primaryAction}
+          secondaryAction={modalConfig.secondaryAction}
+          onClose={() => setModalConfig(null)}
+        />
+      )}
     </SafeAreaView>
   );
 } 
