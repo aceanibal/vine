@@ -6,17 +6,15 @@ import { useState, useEffect } from 'react';
 
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
+import { TokenIcon, getTokenIconProps } from '~/components/TokenIcon';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { PREDEFINED_TOKENS, getTokenById } from '~/lib/tokens';
+import { useAllTokens, useGasPriority, useGlobalStore, useCurrentWallet } from '~/lib/stores/useGlobalStore';
 
 export default function SendScreen() {
   const { colors } = useColorScheme();
+  const tokens = useAllTokens();
+  const currentWallet = useCurrentWallet();
   const params = useLocalSearchParams();
-  console.log('Send page params:', params);
-  const defaultTokenId = (params.tokenId as string) || (params.token as string) || 'gold';
-  console.log('Default token ID:', defaultTokenId);
-  const defaultToken = PREDEFINED_TOKENS.find(t => t.id === defaultTokenId) || PREDEFINED_TOKENS[0];
-  console.log('Default token:', defaultToken);
   
   // Get the source screen to determine where to go back
   const source = params.source as string;
@@ -32,24 +30,31 @@ export default function SendScreen() {
     }
   };
   
-  const [selectedToken, setSelectedToken] = useState(() => {
-    const tokenId = (params.tokenId as string) || (params.token as string) || 'gold';
-    return PREDEFINED_TOKENS.find(t => t.id === tokenId) || PREDEFINED_TOKENS[0];
-  });
+  // Show all available tokens (not filtered by chain)
+  const availableTokens = tokens; // Show all tokens regardless of chain
+  const defaultToken = availableTokens[0]; // Use first available token as default
+  
+  const [selectedToken, setSelectedToken] = useState(defaultToken);
   const [amount, setAmount] = useState('');
   const [recipientAddress, setRecipientAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState(false);
+  const gasPriority = useGasPriority();
+  const setGasPriority = useGlobalStore((state) => state.setGasPriority);
 
-  // Update selected token whenever params change
+  // Component is ready when wallet is available
   useEffect(() => {
-    const tokenId = (params.tokenId as string) || (params.token as string) || 'gold';
-    const newToken = PREDEFINED_TOKENS.find(t => t.id === tokenId) || PREDEFINED_TOKENS[0];
-    setSelectedToken(newToken);
-    // Reset form when token changes
-    setAmount('');
-    setRecipientAddress('');
-  }, [params.tokenId, params.token]);
+    if (currentWallet?.address) {
+      console.log('Send: Wallet available, component ready');
+    }
+  }, [currentWallet]);
+
+  // Update selected token when tokens change
+  useEffect(() => {
+    if (availableTokens.length > 0 && !selectedToken) {
+      setSelectedToken(availableTokens[0]);
+    }
+  }, [availableTokens, selectedToken]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -60,13 +65,36 @@ export default function SendScreen() {
     }).format(amount);
   };
 
+  const formatWei = (wei: number) => {
+    if (wei === 0) return '0 wei';
+    
+    // Convert to gwei for better readability
+    const gwei = wei / Math.pow(10, 9);
+    if (gwei >= 1) {
+      return `${gwei.toFixed(2)} gwei`;
+    }
+    
+    // Show in wei if less than 1 gwei
+    return `${wei.toLocaleString()} wei`;
+  };
+
   const calculateUSDValue = () => {
     const numAmount = parseFloat(amount) || 0;
-    return numAmount * selectedToken.price;
+    return numAmount * (selectedToken?.price || 0);
+  };
+
+  const calculateGasFeeForPriority = (priority: 'slow' | 'standard' | 'fast' = gasPriority) => {
+    // Simple gas fee calculation using global store data
+    const baseGasPrice = 30000000000; // 30 gwei in wei
+    const gasLimit = selectedToken?.isNative ? 21000 : 65000;
+    
+    // Adjust gas price based on priority
+    const multiplier = priority === 'slow' ? 0.8 : priority === 'fast' ? 1.5 : 1.0;
+    return baseGasPrice * gasLimit * multiplier;
   };
 
   const handleSend = () => {
-    if (!amount || !recipientAddress) {
+    if (!amount || !recipientAddress || !selectedToken) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
@@ -86,10 +114,6 @@ export default function SendScreen() {
         `Successfully sent ${amount} ${selectedToken.symbol} to ${recipientAddress.slice(0, 8)}...${recipientAddress.slice(-6)}`,
         [
           {
-            text: 'View Transaction',
-            onPress: () => router.push('/(tabs)/transactions' as any)
-          },
-          {
             text: 'OK',
             onPress: () => handleBackNavigation()
           }
@@ -98,38 +122,44 @@ export default function SendScreen() {
     }, 2000);
   };
 
-  const TokenSelector = ({ token }: { token: typeof PREDEFINED_TOKENS[0] }) => (
-    <TouchableOpacity
-      onPress={() => setSelectedToken(token)}
-      className={`flex-row items-center gap-3 p-3 rounded-lg border ${
-        selectedToken.id === token.id 
-          ? 'border-primary bg-primary/10' 
-          : 'border-border bg-background'
-      }`}
-    >
-      <View 
-        className="rounded-full p-2" 
-        style={{ backgroundColor: token.color + '20' }}
+  const TokenSelector = ({ token, onSelect }: { token: any; onSelect?: () => void }) => {
+    const iconProps = getTokenIconProps(token);
+    const isSelected = selectedToken?.address === token.address;
+    
+    return (
+      <TouchableOpacity
+        onPress={() => {
+          setSelectedToken(token);
+          if (onSelect) onSelect();
+        }}
+        className={`flex-row items-center gap-3 p-3 rounded-lg border ${
+          isSelected
+            ? 'border-primary bg-primary/10' 
+            : 'border-border bg-background'
+        }`}
       >
-        <MaterialIcons 
-          name={token.icon as any} 
-          size={20} 
-          color={token.color} 
+        <TokenIcon
+          {...iconProps}
+          size={20}
+          backgroundColor={iconProps.color + '20'}
         />
-      </View>
-      <View className="flex-1">
-        <Text className="font-semibold">
-          {token.name}
-        </Text>
-        <Text className="text-xs text-muted-foreground">
-          {formatCurrency(token.price)} per {token.symbol}
-        </Text>
-      </View>
-      {selectedToken.id === token.id && (
-        <MaterialIcons name="check-circle" size={20} color={colors.primary} />
-      )}
-    </TouchableOpacity>
-  );
+        <View className="flex-1">
+          <Text className="font-semibold">
+            {token.name}
+          </Text>
+          <Text className="text-xs text-muted-foreground">
+            {token.price ? formatCurrency(token.price) : 'Price unavailable'} per {token.symbol}
+          </Text>
+          <Text className="text-xs text-muted-foreground">
+            {token.chainName}
+          </Text>
+        </View>
+        {isSelected && (
+          <MaterialIcons name="check-circle" size={20} color={colors.primary} />
+        )}
+      </TouchableOpacity>
+    );
+  };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -151,28 +181,30 @@ export default function SendScreen() {
               Token
             </Text>
             <TouchableOpacity 
-              onPress={() => setShowTokenModal(true)}
+              onPress={() => availableTokens.length > 0 && setShowTokenModal(true)}
               className="flex-row items-center justify-between p-4 border border-border rounded-lg bg-background"
             >
               <View className="flex-row items-center gap-3">
-                <View 
-                  className="rounded-full p-2" 
-                  style={{ backgroundColor: selectedToken.color + '20' }}
-                >
-                  <MaterialIcons 
-                    name={selectedToken.icon as any} 
-                    size={20} 
-                    color={selectedToken.color} 
-                  />
-                </View>
-                <View>
-                  <Text className="font-semibold">
-                    {selectedToken.name}
-                  </Text>
-                  <Text className="text-xs text-muted-foreground">
-                    {formatCurrency(selectedToken.price)} per {selectedToken.symbol}
-                  </Text>
-                </View>
+                {selectedToken && (
+                  <>
+                    <TokenIcon
+                      {...getTokenIconProps(selectedToken)}
+                      size={20}
+                      backgroundColor={getTokenIconProps(selectedToken).color + '20'}
+                    />
+                    <View>
+                      <Text className="font-semibold">
+                        {selectedToken.name}
+                      </Text>
+                      <Text className="text-xs text-muted-foreground">
+                        {selectedToken.price ? formatCurrency(selectedToken.price) : 'Price unavailable'} per {selectedToken.symbol}
+                      </Text>
+                      <Text className="text-xs text-muted-foreground">
+                        {selectedToken.chainName}
+                      </Text>
+                    </View>
+                  </>
+                )}
               </View>
               <View className="flex-row items-center gap-2">
                 <Text className="text-muted-foreground">
@@ -190,21 +222,18 @@ export default function SendScreen() {
             </Text>
             <View className="gap-3">
               <View className="flex-row items-center gap-3">
-                <View 
-                  className="rounded-full p-2" 
-                  style={{ backgroundColor: selectedToken.color + '20' }}
-                >
-                  <MaterialIcons 
-                    name={selectedToken.icon as any} 
-                    size={20} 
-                    color={selectedToken.color} 
+                {selectedToken && (
+                  <TokenIcon
+                    {...getTokenIconProps(selectedToken)}
+                    size={20}
+                    backgroundColor={getTokenIconProps(selectedToken).color + '20'}
                   />
-                </View>
+                )}
                 <View className="flex-1">
                   <TextInput
                     value={amount}
                     onChangeText={setAmount}
-                    placeholder={`0.00 ${selectedToken.symbol}`}
+                    placeholder={selectedToken ? `0.00 ${selectedToken.symbol}` : '0.00'}
                     keyboardType="decimal-pad"
                     className="text-lg font-bold"
                     style={{ color: colors.foreground }}
@@ -237,6 +266,38 @@ export default function SendScreen() {
             </View>
           </View>
 
+          {/* Gas Priority Selector */}
+          <View className="gap-4 rounded-xl border border-border bg-card p-6">
+            <Text className="font-semibold">
+              Gas Priority
+            </Text>
+            <View className="flex-row gap-2">
+              {(['slow', 'standard', 'fast'] as const).map((priority) => (
+                <TouchableOpacity
+                  key={priority}
+                  onPress={() => setGasPriority(priority)}
+                  className={`flex-1 p-3 rounded-lg border ${
+                    gasPriority === priority
+                      ? 'border-primary bg-primary/10'
+                      : 'border-border bg-background'
+                  }`}
+                >
+                  <Text className={`text-center font-medium ${
+                    gasPriority === priority ? 'text-primary' : 'text-foreground'
+                  }`}>
+                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
+                  </Text>
+                  <Text className="text-xs text-center text-muted-foreground mt-1">
+                    {formatWei(calculateGasFeeForPriority(priority))}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </View>
+            <Text className="text-xs text-muted-foreground">
+              Higher priority = faster confirmation, higher cost
+            </Text>
+          </View>
+
           {/* Transaction Summary */}
           <View className="gap-4 rounded-xl border border-border bg-card p-6">
             <Text className="font-semibold">
@@ -248,7 +309,15 @@ export default function SendScreen() {
                   Amount
                 </Text>
                 <Text className="font-semibold">
-                  {amount || '0'} {selectedToken.symbol}
+                  {amount || '0'} {selectedToken?.symbol || ''}
+                </Text>
+              </View>
+              <View className="flex-row items-center justify-between">
+                <Text className="text-muted-foreground">
+                  Network
+                </Text>
+                <Text className="font-semibold">
+                  {selectedToken?.chainName || ''}
                 </Text>
               </View>
               <View className="flex-row items-center justify-between">
@@ -261,19 +330,27 @@ export default function SendScreen() {
               </View>
               <View className="flex-row items-center justify-between">
                 <Text className="text-muted-foreground">
-                  Network Fee
+                  Network Fee ({gasPriority})
                 </Text>
                 <Text className="font-semibold">
-                  $0.50
+                  {formatWei(calculateGasFeeForPriority(gasPriority))}
                 </Text>
               </View>
               <View className="border-t border-border pt-3">
                 <View className="flex-row items-center justify-between">
                   <Text className="font-semibold">
-                    Total
+                    Token Value
                   </Text>
                   <Text className="font-bold">
-                    {formatCurrency(calculateUSDValue() + 0.50)}
+                    {formatCurrency(calculateUSDValue())}
+                  </Text>
+                </View>
+                <View className="flex-row items-center justify-between mt-1">
+                  <Text className="text-sm text-muted-foreground">
+                    + Network Fee
+                  </Text>
+                  <Text className="text-sm text-muted-foreground">
+                    {formatWei(calculateGasFeeForPriority(gasPriority))}
                   </Text>
                 </View>
               </View>
@@ -295,7 +372,7 @@ export default function SendScreen() {
             ) : (
               <View className="flex-row items-center gap-2">
                 <MaterialIcons name="send" size={20} color="white" />
-                <Text>Send {selectedToken.symbol}</Text>
+                <Text>Send {selectedToken?.symbol || 'Token'}</Text>
               </View>
             )}
           </Button>
@@ -320,42 +397,25 @@ export default function SendScreen() {
               </TouchableOpacity>
             </View>
             <View className="gap-3">
-              {PREDEFINED_TOKENS.map((token) => (
-                <TouchableOpacity
-                  key={token.id}
-                  onPress={() => {
-                    setSelectedToken(token);
-                    setShowTokenModal(false);
-                  }}
-                  className={`flex-row items-center gap-3 p-4 rounded-lg border ${
-                    selectedToken.id === token.id 
-                      ? 'border-primary bg-primary/10' 
-                      : 'border-border bg-background'
-                  }`}
-                >
-                  <View 
-                    className="rounded-full p-2" 
-                    style={{ backgroundColor: token.color + '20' }}
-                  >
-                    <MaterialIcons 
-                      name={token.icon as any} 
-                      size={20} 
-                      color={token.color} 
-                    />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="font-semibold">
-                      {token.name}
-                    </Text>
-                    <Text className="text-xs text-muted-foreground">
-                      {formatCurrency(token.price)} per {token.symbol}
-                    </Text>
-                  </View>
-                  {selectedToken.id === token.id && (
-                    <MaterialIcons name="check-circle" size={20} color={colors.primary} />
-                  )}
-                </TouchableOpacity>
-              ))}
+              {availableTokens.length > 0 ? (
+                availableTokens.map((token) => (
+                  <TokenSelector 
+                    key={token.address} 
+                    token={token} 
+                    onSelect={() => setShowTokenModal(false)}
+                  />
+                ))
+              ) : (
+                <View className="items-center justify-center py-8">
+                  <MaterialIcons name="add-circle" size={32} color={colors.grey} />
+                  <Text className="mt-2 text-center text-muted-foreground">
+                    No tokens available
+                  </Text>
+                  <Text className="text-xs text-center text-muted-foreground mt-1">
+                    Tokens will appear here when available
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         </View>

@@ -14,11 +14,8 @@ import { useState, useEffect } from 'react';
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { WalletStorage } from '~/lib/walletStorage';
-import { BlockchainUtils } from '~/lib/blockchainUtils';
-import { BlockchainErrorHandler } from '~/lib/blockchainErrorHandler';
+import { useGlobalStore } from '~/lib/stores/useGlobalStore';
 import { CustomModal } from '~/components/CustomModal';
-import { ErrorModalConfig, ErrorSeverity } from '~/lib/blockchainErrorHandler';
 
 const ROOT_STYLE = { flex: 1 };
 
@@ -27,14 +24,17 @@ export default function ImportWalletScreen() {
   const [mnemonic, setMnemonic] = useState<string>('');
   const [isImporting, setIsImporting] = useState(false);
   const [isValidMnemonic, setIsValidMnemonic] = useState(false);
-  const [modalConfig, setModalConfig] = useState<ErrorModalConfig | null>(null);
+  const [modalConfig, setModalConfig] = useState<{
+    title: string;
+    message: string;
+    severity: 'low' | 'medium' | 'high';
+    primaryAction?: { label: string; action: () => void };
+    secondaryAction?: { label: string; action: () => void };
+  } | null>(null);
+  
+  // Get wallet store actions
+  const addWallet = useGlobalStore((state) => state.addWallet);
 
-  useEffect(() => {
-    // Set up error handler callbacks for custom modals
-    BlockchainErrorHandler.setErrorModalCallback((config) => {
-      setModalConfig(config);
-    });
-  }, []);
 
   const validateMnemonic = (phrase: string) => {
     try {
@@ -58,7 +58,7 @@ export default function ImportWalletScreen() {
       setModalConfig({
         title: 'Invalid Recovery Phrase',
         message: 'Please enter a valid 12-word recovery phrase.',
-        severity: ErrorSeverity.HIGH,
+        severity: 'high',
         primaryAction: {
           label: 'OK',
           action: () => setModalConfig(null)
@@ -73,15 +73,25 @@ export default function ImportWalletScreen() {
       // Create wallet from mnemonic
       const wallet = ethers.Wallet.fromPhrase(mnemonic.trim());
       
-      // Save wallet to secure storage
-      await WalletStorage.saveWallet(wallet as any, mnemonic.trim());
+      // Save wallet to Zustand store
+      const walletData = {
+        address: wallet.address,
+        privateKey: wallet.privateKey,
+        mnemonic: mnemonic.trim(),
+        isImported: true,
+        createdAt: new Date(),
+      };
       
-      // Format address for display using utility
-      const formattedAddress = BlockchainUtils.Address.formatAddressForDisplay(wallet.address);
+      addWallet(walletData);
+      console.log('Imported wallet saved to Zustand store:', wallet.address);
+      
+      
+      // Format address for display
+      const formattedAddress = `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`;
       setModalConfig({
         title: 'Wallet Imported Successfully!',
         message: `Your wallet has been imported and securely stored.\n\nAddress: ${formattedAddress}`,
-        severity: ErrorSeverity.LOW,
+        severity: 'low',
         primaryAction: {
           label: 'Continue',
           action: () => {
@@ -93,8 +103,16 @@ export default function ImportWalletScreen() {
     } catch (error) {
       console.error('Failed to import wallet:', error);
       
-      // Use error handler for consistent error display
-      BlockchainErrorHandler.handleError(error, 'Wallet Import');
+      // Show error modal
+      setModalConfig({
+        title: 'Wallet Import Failed',
+        message: 'There was an error importing your wallet. Please check your recovery phrase and try again.',
+        severity: 'high',
+        primaryAction: {
+          label: 'Try Again',
+          action: () => setModalConfig(null)
+        }
+      });
     } finally {
       setIsImporting(false);
     }

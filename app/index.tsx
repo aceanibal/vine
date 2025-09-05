@@ -2,33 +2,56 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
 import { Platform, View, ScrollView, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { WalletStorage } from '~/lib/walletStorage';
+import { useCurrentWallet, useIsWalletCreated, useGlobalStore } from '~/lib/stores/useGlobalStore';
+import { dataManager } from '~/lib/dataManager';
 
 const ROOT_STYLE: ViewStyle = { flex: 1 };
 
 export default function WelcomeConsentScreen() {
   const { colors } = useColorScheme();
+  const currentWallet = useCurrentWallet();
+  const isWalletCreated = useIsWalletCreated();
+  const _hasHydrated = useGlobalStore((state) => state._hasHydrated);
+  const [isCheckingWallet, setIsCheckingWallet] = useState(true);
   
   useEffect(() => {
-    // Check if wallet exists and redirect if it does
-    checkWalletExists();
-  }, []);
+    // Only check wallet after store is hydrated
+    if (_hasHydrated) {
+      const timer = setTimeout(async () => {
+        await checkWalletExists();
+        setIsCheckingWallet(false);
+      }, 100);
+
+      return () => clearTimeout(timer);
+    }
+  }, [_hasHydrated, currentWallet, isWalletCreated]);
 
   const checkWalletExists = async () => {
-    try {
-      const hasWallet = await WalletStorage.hasWallet();
-      console.log('Wallet check result:', hasWallet);
-      if (hasWallet) {
-        console.log('Redirecting to dashboard');
-        router.replace('/(tabs)/dashboard');
+    const hasWallet = !!(currentWallet && isWalletCreated);
+    console.log('Wallet check result:', hasWallet);
+    console.log('Current wallet:', currentWallet?.address);
+    console.log('Is wallet created:', isWalletCreated);
+    
+    if (hasWallet && currentWallet?.address) {
+      console.log('Initializing wallet data...');
+      try {
+        await dataManager.initializeWalletData(currentWallet.address);
+        console.log('Wallet data initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize wallet data:', error);
+        // Continue to dashboard even if data manager fails
       }
-    } catch (error) {
-      console.error('Failed to check wallet existence:', error);
+      
+      console.log('Redirecting to dashboard');
+      // Use a small delay to ensure navigation is safe
+      setTimeout(() => {
+        router.replace('/(tabs)/dashboard');
+      }, 50);
     }
   };
   
@@ -40,6 +63,18 @@ export default function WelcomeConsentScreen() {
   const handleImportWallet = () => {
     router.replace('/(auth)/import-wallet' as any);
   };
+
+  // Show loading state while checking wallet or until store is hydrated
+  if (isCheckingWallet || !_hasHydrated) {
+    return (
+      <SafeAreaView className="flex-1 bg-white">
+        <View className="flex-1 items-center justify-center">
+          <MaterialIcons name="hourglass-empty" size={48} color={colors.primary} />
+          <Text className="mt-4 text-lg font-semibold">Loading...</Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView className="flex-1">

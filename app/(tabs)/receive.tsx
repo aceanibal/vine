@@ -9,17 +9,14 @@ import * as Clipboard from 'expo-clipboard';
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { WalletStorage } from '~/lib/walletStorage';
-import { CustomModal } from '~/components/CustomModal';
-import { BlockchainErrorHandler, ErrorModalConfig, ErrorSeverity } from '~/lib/blockchainErrorHandler';
-import { PREDEFINED_TOKENS } from '~/lib/tokens';
+import { useCurrentWallet, useAllTokens } from '~/lib/stores/useGlobalStore';
 
 export default function ReceiveScreen() {
   const { colors } = useColorScheme();
+  const currentWallet = useCurrentWallet();
+  const tokens = useAllTokens();
   const params = useLocalSearchParams();
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [modalConfig, setModalConfig] = useState<ErrorModalConfig | null>(null);
   
   // Get the source screen to determine where to go back
   const source = params.source as string;
@@ -34,74 +31,30 @@ export default function ReceiveScreen() {
   };
 
   useEffect(() => {
-    loadWallet();
-  }, []);
-
-  const loadWallet = async () => {
-    try {
-      const address = await WalletStorage.getWalletAddress();
-      setWalletAddress(address);
-    } catch (error) {
-      console.error('Failed to load wallet:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
+    setIsLoading(false);
+  }, [currentWallet]);
 
   const copyToClipboard = async () => {
-    if (walletAddress) {
+    if (currentWallet?.address) {
       try {
-        await Clipboard.setStringAsync(walletAddress);
-        // Use custom modal instead of system alert
-        setModalConfig({
-          title: 'Address Copied!',
-          message: 'Your wallet address has been copied to the clipboard.',
-          severity: ErrorSeverity.LOW,
-          primaryAction: {
-            label: 'OK',
-            action: () => setModalConfig(null)
-          }
-        });
+        await Clipboard.setStringAsync(currentWallet.address);
+        Alert.alert('Success', 'Address copied to clipboard!');
       } catch (error) {
         console.error('Failed to copy to clipboard:', error);
-        setModalConfig({
-          title: 'Copy Failed',
-          message: 'Failed to copy address to clipboard. Please try again.',
-          severity: ErrorSeverity.MEDIUM,
-          primaryAction: {
-            label: 'OK',
-            action: () => setModalConfig(null)
-          }
-        });
+        Alert.alert('Error', 'Failed to copy address to clipboard. Please try again.');
       }
     }
   };
 
   const shareAddress = async () => {
-    if (walletAddress) {
+    if (currentWallet?.address) {
       try {
         // Copy to clipboard as a sharing mechanism for now
-        await Clipboard.setStringAsync(walletAddress);
-        setModalConfig({
-          title: 'Address Ready to Share',
-          message: 'Your wallet address has been copied to the clipboard. You can now paste it in any messaging app to share.',
-          severity: ErrorSeverity.LOW,
-          primaryAction: {
-            label: 'Got it',
-            action: () => setModalConfig(null)
-          }
-        });
+        await Clipboard.setStringAsync(currentWallet.address);
+        Alert.alert('Ready to Share', 'Address copied to clipboard. You can now paste it in any messaging app to share.');
       } catch (error) {
         console.error('Failed to prepare address for sharing:', error);
-        setModalConfig({
-          title: 'Share Failed',
-          message: 'Failed to prepare address for sharing. Please try again.',
-          severity: ErrorSeverity.MEDIUM,
-          primaryAction: {
-            label: 'OK',
-            action: () => setModalConfig(null)
-          }
-        });
+        Alert.alert('Error', 'Failed to prepare address for sharing. Please try again.');
       }
     }
   };
@@ -125,7 +78,7 @@ export default function ReceiveScreen() {
     );
   }
 
-  if (!walletAddress) {
+  if (!currentWallet?.address) {
     return (
       <SafeAreaView className="flex-1 bg-white">
         <View className="flex-row items-center justify-between p-4 border-b border-border bg-white">
@@ -172,7 +125,7 @@ export default function ReceiveScreen() {
             <View className="items-center gap-4">
               <View className="bg-white p-4 rounded-lg">
                 <QRCode
-                  value={walletAddress || ''}
+                  value={currentWallet?.address || ''}
                   size={200}
                   color="black"
                   backgroundColor="white"
@@ -192,7 +145,7 @@ export default function ReceiveScreen() {
             <View className="gap-3">
               <View className="p-3 border border-border rounded-lg bg-background">
                 <Text className="font-mono text-center">
-                  {walletAddress}
+                  {currentWallet?.address}
                 </Text>
               </View>
               <Text className="text-xs text-muted-foreground text-center">
@@ -228,16 +181,16 @@ export default function ReceiveScreen() {
               Supported Tokens (Polygon)
             </Text>
             <View className="gap-3">
-              {PREDEFINED_TOKENS.map((token) => (
-                <View key={token.id} className="flex-row items-center gap-3">
+              {tokens.map((token) => (
+                <View key={`${token.address}-${token.chainId}`} className="flex-row items-center gap-3">
                   <View 
                     className="rounded-full p-2" 
-                    style={{ backgroundColor: token.color + '20' }}
+                    style={{ backgroundColor: (token.color || '#666') + '20' }}
                   >
                     <MaterialIcons 
-                      name={token.icon as any} 
+                      name="account-balance-wallet" 
                       size={16} 
-                      color={token.color} 
+                      color={token.color || '#666'} 
                     />
                   </View>
                   <Text>{token.name} ({token.symbol})</Text>
@@ -274,19 +227,6 @@ export default function ReceiveScreen() {
           </View>
         </View>
       </ScrollView>
-
-      {/* Custom Modal for feedback */}
-      {modalConfig && (
-        <CustomModal
-          isVisible={true}
-          title={modalConfig.title}
-          message={modalConfig.message}
-          severity={modalConfig.severity}
-          primaryAction={modalConfig.primaryAction}
-          secondaryAction={modalConfig.secondaryAction}
-          onClose={() => setModalConfig(null)}
-        />
-      )}
     </SafeAreaView>
   );
 } 

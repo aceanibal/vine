@@ -2,92 +2,72 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
 
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
+import { TokenIcon, getTokenIconProps } from '~/components/TokenIcon';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { WalletStorage } from '~/lib/walletStorage';
-import { PREDEFINED_TOKENS, calculateTotalNetAssetValue, getTokenById, createLiveTokenData } from '~/lib/tokens';
-import { getTransactionIcon, getTransactionColor, getTransactionTitle, formatTimeAgo } from '~/lib/transactions';
-import { transactionManager } from '~/lib/transactionManager';
-import { balanceService, WalletBalances } from '~/lib/balanceService';
+import { useGlobalStore, useCurrentWallet, useAllTokens, useAllTransactions } from '~/lib/stores/useGlobalStore';
 
 export default function DashboardScreen() {
   const { colors } = useColorScheme();
-  const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [balances, setBalances] = useState<WalletBalances | null>(null);
-  const [isLoadingBalances, setIsLoadingBalances] = useState(false);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
+  const [walletAddress, setWalletAddress] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
 
-  useEffect(() => {
-    loadWallet();
-  }, []);
-
-  const loadWallet = async () => {
-    try {
-      const address = await WalletStorage.getWalletAddress();
-      setWalletAddress(address);
-      
-      // Load live balances if wallet exists
-      if (address) {
-        await loadBalances();
+  // Get wallet and token data from stores
+  const currentWallet = useCurrentWallet();
+  const addWallet = useGlobalStore((state) => state.addWallet);
+  const tokens = useAllTokens();
+  
+  // Get recent transactions for display from global store
+  const allTransactions = useAllTransactions();
+  const recentTransactions = useMemo(() => allTransactions.slice(0, 5), [allTransactions]);
+  
+  // Calculate total portfolio value locally
+  const totalPortfolioValue = useMemo(() => {
+    return tokens.reduce((total, token) => {
+      if (token.balance && token.price) {
+        const balance = parseFloat(token.balance) / Math.pow(10, token.decimals);
+        return total + (balance * token.price);
       }
-    } catch (error) {
-      console.error('Failed to load wallet:', error);
-    } finally {
+      return total;
+    }, 0);
+  }, [tokens]);
+  
+  // Set wallet address when component mounts
+  useEffect(() => {
+    if (currentWallet?.address) {
+      setWalletAddress(currentWallet.address);
+      setIsLoading(false);
+    } else {
       setIsLoading(false);
     }
-  };
+  }, [currentWallet]);
 
-  const loadBalances = async (fromRefresh = false) => {
-    try {
-      if (!fromRefresh) {
-        setIsLoadingBalances(true);
-      }
-      console.log('Loading live balances...');
-      const liveBalances = await balanceService.getLiveBalances();
-      setBalances(liveBalances);
-      setLastUpdated(new Date());
-      console.log('Live balances loaded successfully:', liveBalances);
-      
-      // Also refresh transactions when loading balances
-      try {
-        await transactionManager.refreshTransactions();
-        console.log('Transactions refreshed successfully');
-      } catch (error) {
-        console.error('Failed to refresh transactions:', error);
-      }
-    } catch (error) {
-      console.error('Failed to load balances:', error);
-      // Keep balances as null to show loading or error state
-    } finally {
-      if (!fromRefresh) {
-        setIsLoadingBalances(false);
-      }
-    }
-  };
+  // Check if wallet exists
+  const hasWallet = !!walletAddress;
 
   const onRefresh = async () => {
     try {
       setIsRefreshing(true);
-      console.log('Pull-to-refresh: Refreshing balances...');
+      console.log('Pull-to-refresh: Refreshing...');
       
       // Add haptic feedback for better user experience
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       
-      // Reload balances from blockchain
-      await loadBalances(true);
+      // Just update the last updated time
+      setLastUpdated(new Date());
       
       // Success haptic feedback
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
-      console.log('Pull-to-refresh: Balances refreshed successfully');
+      console.log('Pull-to-refresh: Refresh completed');
     } catch (error) {
-      console.error('Pull-to-refresh: Failed to refresh balances:', error);
+      console.error('Pull-to-refresh: Failed to refresh:', error);
       // Error haptic feedback
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
@@ -108,18 +88,7 @@ export default function DashboardScreen() {
     }).format(amount);
   };
 
-  const formatNumber = (num: number) => {
-    if (num >= 1e9) {
-      return (num / 1e9).toFixed(2) + 'B';
-    }
-    if (num >= 1e6) {
-      return (num / 1e6).toFixed(2) + 'M';
-    }
-    if (num >= 1e3) {
-      return (num / 1e3).toFixed(2) + 'K';
-    }
-    return num.toFixed(2);
-  };
+  // Removed formatNumber function - not used in dashboard
 
   const formatLastUpdated = (date: Date | null) => {
     if (!date) return '';
@@ -140,9 +109,58 @@ export default function DashboardScreen() {
     }
   };
 
-  // Calculate total net asset value from live balances using single source of truth
-  const liveTokens = createLiveTokenData(balances);
-  const totalNetAssetValue = liveTokens.reduce((total, token) => total + token.value, 0);
+  // Component to display a single token with balance
+  const TokenItem = ({ token }: { token: any }) => {
+    // Get all data from global store - no calculations here
+    const formattedBalance = token.formattedBalance || '0';
+    const tokenValue = token.tokenValue || 0;
+    const price = token.price || 0;
+
+    return (
+      <TouchableOpacity 
+        className="flex-row items-center justify-between rounded-lg border border-border bg-background p-4"
+        onPress={() => {
+          router.push({
+            pathname: '/(tabs)/send',
+            params: { 
+              tokenAddress: token.address,
+              chainId: token.chainId,
+              source: 'dashboard'
+            }
+          } as any);
+        }}
+      >
+        <View className="flex-row items-center gap-3">
+          <TokenIcon
+            {...getTokenIconProps(token)}
+            size={20}
+            backgroundColor={getTokenIconProps(token).color + '20'}
+          />
+          <View>
+            <Text className="text-base font-semibold">
+              {token.symbol}
+            </Text>
+            <Text className="text-xs text-muted-foreground">
+              {token.name} • {token.chainName}
+            </Text>
+            <Text className="text-xs text-muted-foreground">
+              {formattedBalance} {token.symbol}
+            </Text>
+          </View>
+        </View>
+        <View className="items-end">
+          <Text className="text-base font-semibold">
+            {formatCurrency(tokenValue)}
+          </Text>
+          {price > 0 && (
+            <Text className="text-xs text-muted-foreground">
+              ${price.toFixed(2)}
+            </Text>
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
   if (isLoading) {
     return (
@@ -152,7 +170,7 @@ export default function DashboardScreen() {
     );
   }
 
-  if (!walletAddress) {
+  if (!hasWallet) {
     return (
       <View className="flex-1 items-center justify-center px-8">
         <MaterialIcons name="account-balance-wallet" size={64} color={colors.primary} />
@@ -211,7 +229,7 @@ export default function DashboardScreen() {
             </View>
             <View className="gap-2">
               <Text className="text-lg font-bold">
-                {formatCurrency(totalNetAssetValue)}
+                {formatCurrency(totalPortfolioValue)}
               </Text>
               <Text className="text-xs text-muted-foreground">
                 Portfolio Value
@@ -226,17 +244,17 @@ export default function DashboardScreen() {
                 Your Assets
               </Text>
               <TouchableOpacity 
-                onPress={() => loadBalances(false)}
-                disabled={isLoadingBalances || isRefreshing}
+                onPress={onRefresh}
+                disabled={isRefreshing}
                 className="flex-row items-center gap-1"
               >
                 <MaterialIcons 
                   name="refresh" 
                   size={16} 
-                  color={(isLoadingBalances || isRefreshing) ? colors.grey : colors.primary} 
+                  color={isRefreshing ? colors.grey : colors.primary} 
                 />
                 <Text className="text-xs text-primary font-medium">
-                  {(isLoadingBalances || isRefreshing) ? 'Loading...' : 'Refresh'}
+                  {isRefreshing ? 'Loading...' : 'Refresh'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -246,88 +264,18 @@ export default function DashboardScreen() {
               </Text>
             )}
             <View className="gap-3">
-              {liveTokens.length > 0 ? liveTokens.map((token) => {
-                const priceChangeColor = token.priceChange24h >= 0 ? '#4CAF50' : '#F44336';
-                
-                return (
-                  <TouchableOpacity 
-                    key={token.id} 
-                    className="flex-row items-center justify-between rounded-lg border border-border bg-background p-4"
-                    onPress={() => {
-                      console.log('Clicking token:', token.id);
-                      router.push({
-                        pathname: '/(tabs)/send',
-                        params: { 
-                          tokenId: token.id,
-                          source: 'dashboard'
-                        }
-                      } as any);
-                    }}
-                  >
-                    <View className="flex-row items-center gap-3">
-                      <View 
-                        className="rounded-full p-2" 
-                        style={{ backgroundColor: token.color + '20' }}
-                      >
-                        <MaterialIcons 
-                          name={token.icon as any} 
-                          size={20} 
-                          color={token.color} 
-                        />
-                      </View>
-                      <View>
-                        <Text className="text-base font-semibold">
-                          {token.name}
-                        </Text>
-                        <Text className="text-xs text-muted-foreground">
-                          {token.formattedBalance}
-                        </Text>
-                      </View>
-                    </View>
-                    <View className="items-end">
-                      <Text className="text-base font-semibold">
-                        {formatCurrency(token.value)}
-                      </Text>
-                      <View className="flex-row items-center gap-1">
-                        <MaterialIcons 
-                          name={token.priceChange24h >= 0 ? 'trending-up' : 'trending-down'} 
-                          size={12} 
-                          color={priceChangeColor} 
-                        />
-                        <Text 
-                          className="text-xs"
-                          style={{ color: priceChangeColor }}
-                        >
-                          {token.priceChange24h >= 0 ? '+' : ''}{token.priceChange24h.toFixed(1)}%
-                        </Text>
-                      </View>
-                    </View>
-                  </TouchableOpacity>
-                );
-              }) : (
-                // Loading state or hint
-                isLoadingBalances || isRefreshing ? [1, 2, 3].map((i) => (
-                  <View key={i} className="flex-row items-center justify-between rounded-lg border border-border bg-background p-4">
-                    <View className="flex-row items-center gap-3">
-                      <View className="w-10 h-10 rounded-full bg-gray-200" />
-                      <View>
-                        <View className="w-20 h-4 bg-gray-200 rounded mb-1" />
-                        <View className="w-16 h-3 bg-gray-200 rounded" />
-                      </View>
-                    </View>
-                    <View className="items-end">
-                      <View className="w-16 h-4 bg-gray-200 rounded mb-1" />
-                      <View className="w-12 h-3 bg-gray-200 rounded" />
-                    </View>
-                  </View>
-                )) : (
-                  <View className="items-center justify-center py-8">
-                    <MaterialIcons name="refresh" size={32} color={colors.grey} />
-                    <Text className="mt-2 text-center text-muted-foreground">
-                      Pull down to refresh balances
-                    </Text>
-                  </View>
-                )
+              {tokens.length > 0 ? tokens.map((token) => (
+                <TokenItem key={`${token.address}-${token.chainId}`} token={token} />
+              )) : (
+                <View className="items-center justify-center py-8">
+                  <MaterialIcons name="account-balance-wallet" size={32} color={colors.grey} />
+                  <Text className="mt-2 text-center text-muted-foreground">
+                    No tokens found
+                  </Text>
+                  <Text className="text-xs text-center text-muted-foreground mt-1">
+                    Tokens will appear here when you have transaction history
+                  </Text>
+                </View>
               )}
             </View>
           </View>
@@ -337,73 +285,71 @@ export default function DashboardScreen() {
           {/* Recent Activity */}
           <View className="gap-4 rounded-xl border border-border bg-card p-6">
             <View className="flex-row items-center justify-between">
-                          <Text className="text-lg font-semibold">
-              Recent Activity
-            </Text>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/transactions' as any)}>
+              <Text className="text-lg font-semibold">
+                Recent Activity
+              </Text>
+              <TouchableOpacity onPress={() => {
+                // TODO: Navigate to new transactions screen when implemented
+                console.log('Navigate to transactions screen');
+              }}>
                 <Text className="text-xs text-primary font-medium">
                   View all
                 </Text>
               </TouchableOpacity>
             </View>
             <View className="gap-3">
-              {transactionManager.getRecentTransactions(3).map((transaction) => {
-                const token = getTokenById(transaction.tokenId);
-                const icon = getTransactionIcon(transaction.type);
-                const color = getTransactionColor(transaction.type);
-                const title = getTransactionTitle(transaction.type);
-
-                // Enhanced display for gas token and metadata
-                const displaySymbol = transaction.metadata?.tokenSymbol || token?.symbol || '';
-                const description = transaction.metadata?.description;
-
-                return (
-                  <View key={transaction.id} className="flex-row items-center justify-between py-2">
-                    <View className="flex-row items-center gap-3">
-                      <View 
-                        className="rounded-full p-1.5" 
-                        style={{ backgroundColor: color + '15' }}
-                      >
+              {recentTransactions.length > 0 ? (
+                recentTransactions.map((tx, index) => (
+                  <TouchableOpacity 
+                    key={`${tx.hash}-${index}`}
+                    className="flex-row items-center justify-between rounded-lg border border-border bg-background p-4"
+                    onPress={() => {
+                      console.log('Transaction pressed:', tx.hash);
+                      // TODO: Navigate to transaction details
+                    }}
+                  >
+                    <View className="flex-row items-center flex-1">
+                      <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
+                        tx.direction === 'receive' ? 'bg-green-100' : 'bg-red-100'
+                      }`}>
                         <MaterialIcons 
-                          name={icon as any} 
-                          size={14} 
-                          color={color} 
+                          name={tx.direction === 'receive' ? 'arrow-downward' : 'arrow-upward'} 
+                          size={20} 
+                          color={tx.direction === 'receive' ? '#10B981' : '#EF4444'} 
                         />
                       </View>
                       <View className="flex-1">
-                        <Text className="text-sm">
-                          {title} {displaySymbol}
+                        <Text className="font-medium text-foreground">
+                          {tx.summary || `${tx.direction} ${tx.tokenSymbol || 'transaction'}`}
                         </Text>
-                        {description && (
-                          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-                            {description}
-                          </Text>
-                        )}
-                        <Text className="text-xs text-muted-foreground">
-                          {formatTimeAgo(transaction.timestamp)}
+                        <Text className="text-sm text-muted-foreground">
+                          {new Date(tx.timestamp).toLocaleDateString()}
                         </Text>
                       </View>
                     </View>
                     <View className="items-end">
-                      {transaction.type !== 'approve' && transaction.type !== 'contract_deployment' && (
-                        <Text className="text-sm">
-                          {transaction.amount.toFixed(transaction.metadata?.tokenDecimals === 6 ? 2 : 4)} {displaySymbol}
-                        </Text>
-                      )}
-                      {transaction.value > 0 && (
-                        <Text className="text-xs text-muted-foreground">
-                          {formatCurrency(transaction.value)}
-                        </Text>
-                      )}
-                      {transaction.gasFee && (
-                        <Text className="text-xs text-orange-600">
-                          Gas: {transaction.gasFee.toFixed(6)} MATIC
-                        </Text>
-                      )}
+                      <Text className={`font-medium ${
+                        tx.direction === 'receive' ? 'text-green-600' : 'text-red-600'
+                      }`}>
+                        {tx.direction === 'receive' ? '+' : '-'}{tx.formattedValue || '0'} {tx.tokenSymbol || ''}
+                      </Text>
+                      <Text className="text-xs text-muted-foreground">
+                        {tx.status}
+                      </Text>
                     </View>
-                  </View>
-                );
-              })}
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <View className="items-center justify-center py-8">
+                  <MaterialIcons name="history" size={32} color={colors.grey} />
+                  <Text className="mt-2 text-center text-muted-foreground">
+                    No transactions yet
+                  </Text>
+                  <Text className="text-xs text-muted-foreground text-center mt-1">
+                    Your transaction history will appear here
+                  </Text>
+                </View>
+              )}
             </View>
           </View>
         </View>

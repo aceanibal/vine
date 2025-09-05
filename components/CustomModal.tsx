@@ -2,14 +2,13 @@ import React from 'react';
 import { Modal, View, Text, TouchableOpacity } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { ErrorSeverity } from '~/lib/blockchainErrorHandler';
 
 interface CustomModalProps {
   visible: boolean;
   title: string;
   message: string;
   type?: 'success' | 'error' | 'info' | 'warning';
-  severity?: ErrorSeverity;
+  severity?: 'low' | 'medium' | 'high' | 'critical';
   onConfirm?: () => void;
   onCancel?: () => void;
   onClose?: () => void;
@@ -42,10 +41,10 @@ export function CustomModal({
   const getIconName = () => {
     if (severity) {
       switch (severity) {
-        case ErrorSeverity.CRITICAL: return 'error';
-        case ErrorSeverity.HIGH: return 'warning';
-        case ErrorSeverity.MEDIUM: return 'info';
-        case ErrorSeverity.LOW: return 'check-circle';
+        case 'critical': return 'error';
+        case 'high': return 'warning';
+        case 'medium': return 'info';
+        case 'low': return 'check-circle';
         default: return 'info';
       }
     }
@@ -60,10 +59,10 @@ export function CustomModal({
   const getIconColor = () => {
     if (severity) {
       switch (severity) {
-        case ErrorSeverity.CRITICAL: return '#EF4444';
-        case ErrorSeverity.HIGH: return '#F59E0B';
-        case ErrorSeverity.MEDIUM: return '#3B82F6';
-        case ErrorSeverity.LOW: return '#10B981';
+        case 'critical': return '#EF4444';
+        case 'high': return '#F59E0B';
+        case 'medium': return '#3B82F6';
+        case 'low': return '#10B981';
         default: return '#3B82F6';
       }
     }
@@ -78,10 +77,10 @@ export function CustomModal({
   const getConfirmButtonClass = () => {
     if (severity) {
       switch (severity) {
-        case ErrorSeverity.CRITICAL: return 'bg-red-500';
-        case ErrorSeverity.HIGH: return 'bg-amber-500';
-        case ErrorSeverity.MEDIUM: return 'bg-blue-500';
-        case ErrorSeverity.LOW: return 'bg-emerald-500';
+        case 'critical': return 'bg-red-500';
+        case 'high': return 'bg-amber-500';
+        case 'medium': return 'bg-blue-500';
+        case 'low': return 'bg-emerald-500';
         default: return 'bg-blue-500';
       }
     }

@@ -14,11 +14,8 @@ import { useState, useEffect } from 'react';
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { WalletStorage } from '~/lib/walletStorage';
-import { BlockchainUtils } from '~/lib/blockchainUtils';
-import { BlockchainErrorHandler } from '~/lib/blockchainErrorHandler';
+import { useGlobalStore } from '~/lib/stores/useGlobalStore';
 import { CustomModal } from '~/components/CustomModal';
-import { ErrorModalConfig, ErrorSeverity } from '~/lib/blockchainErrorHandler';
 
 const ROOT_STYLE = { flex: 1 };
 
@@ -27,29 +24,21 @@ export default function CreateWalletScreen() {
   const [mnemonic, setMnemonic] = useState<string>('');
   const [hasConfirmed, setHasConfirmed] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
-  const [modalConfig, setModalConfig] = useState<ErrorModalConfig | null>(null);
-
-  console.log('CreateWalletScreen rendered');
+  const [modalConfig, setModalConfig] = useState<{
+    title: string;
+    message: string;
+    severity: 'low' | 'medium' | 'high';
+    primaryAction?: { label: string; action: () => void };
+    secondaryAction?: { label: string; action: () => void };
+  } | null>(null);
+  
+  // Get wallet store actions
+  const addWallet = useGlobalStore((state) => state.addWallet);
 
   useEffect(() => {
-    console.log('CreateWalletScreen useEffect triggered');
-    
-    // Set up error handler callbacks for custom modals
-    BlockchainErrorHandler.setErrorModalCallback((config) => {
-      setModalConfig(config);
-    });
-
-    // Generate mnemonic using enhanced utility with validation
-    const newMnemonic = BlockchainUtils.Wallet.generateMnemonic();
-    
-    // Validate the generated mnemonic
-    if (BlockchainUtils.Wallet.isValidMnemonic(newMnemonic)) {
-      setMnemonic(newMnemonic);
-    } else {
-      // Fallback to ethers if utility fails
-      const fallbackMnemonic = ethers.Wallet.createRandom().mnemonic?.phrase || '';
-      setMnemonic(fallbackMnemonic);
-    }
+    // Generate mnemonic using ethers
+    const newMnemonic = ethers.Wallet.createRandom().mnemonic?.phrase || '';
+    setMnemonic(newMnemonic);
   }, []);
 
   const handleCreateWallet = async () => {
@@ -58,7 +47,7 @@ export default function CreateWalletScreen() {
       setModalConfig({
         title: 'Write Down Your Phrase',
         message: 'Please make sure you have written down your 12-word recovery phrase before continuing.',
-        severity: ErrorSeverity.MEDIUM,
+        severity: 'medium',
         primaryAction: {
           label: 'I\'ve Written It Down',
           action: () => {
@@ -77,23 +66,28 @@ export default function CreateWalletScreen() {
     setIsCreating(true);
     
     try {
-      // Validate mnemonic before wallet creation
-      if (!BlockchainUtils.Wallet.isValidMnemonic(mnemonic)) {
-        throw new Error('Invalid mnemonic phrase generated');
-      }
-
       // Create wallet from mnemonic
       const wallet = ethers.Wallet.fromPhrase(mnemonic);
       
-      // Save wallet to secure storage
-      await WalletStorage.saveWallet(wallet as any, mnemonic);
+      // Save wallet to Zustand store
+      const walletData = {
+        address: wallet.address,
+        privateKey: wallet.privateKey,
+        mnemonic: mnemonic,
+        isImported: false,
+        createdAt: new Date(),
+      };
+      
+      addWallet(walletData);
+      console.log('Wallet saved to Zustand store:', wallet.address);
+      
       
       // Show success with custom modal and formatted address
-      const formattedAddress = BlockchainUtils.Address.formatAddressForDisplay(wallet.address);
+      const formattedAddress = `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`;
       setModalConfig({
         title: 'Wallet Created Successfully!',
         message: `Your wallet has been created and securely stored.\n\nAddress: ${formattedAddress}`,
-        severity: ErrorSeverity.LOW,
+        severity: 'low',
         primaryAction: {
           label: 'Continue',
           action: () => {
@@ -105,8 +99,16 @@ export default function CreateWalletScreen() {
     } catch (error) {
       console.error('Failed to create wallet:', error);
       
-      // Use error handler for consistent error display
-      BlockchainErrorHandler.handleError(error, 'Wallet Creation');
+      // Show error modal
+      setModalConfig({
+        title: 'Wallet Creation Failed',
+        message: 'There was an error creating your wallet. Please try again.',
+        severity: 'high',
+        primaryAction: {
+          label: 'Try Again',
+          action: () => setModalConfig(null)
+        }
+      });
     } finally {
       setIsCreating(false);
     }

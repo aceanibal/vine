@@ -19,15 +19,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="exchange"
-        options={{
-          title: 'Exchange',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="currency-exchange" size={size} color={color} />
-          ),
-        }}
-      />
+
       <Tabs.Screen
         name="transfer"
         options={{
@@ -47,18 +39,6 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="transactions"
-        options={{
-          href: null, // This hides the tab from the bottom navigation
-        }}
-      />
-      <Tabs.Screen
-        name="account-details"
-        options={{
-          href: null, // This hides the tab from the bottom navigation
-        }}
-      />
-      <Tabs.Screen
         name="send"
         options={{
           href: null, // This hides the tab from the bottom navigation
@@ -70,18 +50,7 @@ export default function TabLayout() {
           href: null, // This hides the tab from the bottom navigation
         }}
       />
-      <Tabs.Screen
-        name="buy"
-        options={{
-          href: null, // This hides the tab from the bottom navigation
-        }}
-      />
-      <Tabs.Screen
-        name="sell"
-        options={{
-          href: null, // This hides the tab from the bottom navigation
-        }}
-      />
+
     </Tabs>
   );
 } 

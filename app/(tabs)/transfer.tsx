@@ -5,21 +5,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { getTransactionIcon, getTransactionColor, getTransactionTitle, formatTimeAgo } from '~/lib/transactions';
-import { transactionManager } from '~/lib/transactionManager';
-import { getTokenById } from '~/lib/tokens';
 
 export default function TransferScreen() {
   const { colors } = useColorScheme();
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
-  };
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -33,10 +21,10 @@ export default function TransferScreen() {
       <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">
         <View className="gap-6">
 
-          {/* Quick Actions */}
+          {/* Transfer Actions */}
           <View className="gap-4 rounded-xl border border-border bg-card p-6">
             <Text className="text-lg font-semibold">
-              Actions
+              Transfer Options
             </Text>
             <View className="gap-3">
               <TouchableOpacity 
@@ -54,12 +42,12 @@ export default function TransferScreen() {
                     <MaterialIcons name="send" size={20} color="white" />
                   </View>
                   <View>
-                                    <Text className="text-base font-semibold">
-                  Send
-                </Text>
-                <Text className="text-xs text-muted-foreground">
-                  Transfer tokens
-                </Text>
+                    <Text className="text-base font-semibold">
+                      Send
+                    </Text>
+                    <Text className="text-xs text-muted-foreground">
+                      Transfer tokens to another wallet
+                    </Text>
                   </View>
                 </View>
                 <MaterialIcons name="chevron-right" size={20} color={colors.grey} />
@@ -84,112 +72,12 @@ export default function TransferScreen() {
                       Receive
                     </Text>
                     <Text className="text-xs text-muted-foreground">
-                      Show QR code
+                      Show QR code to receive tokens
                     </Text>
                   </View>
                 </View>
                 <MaterialIcons name="chevron-right" size={20} color={colors.grey} />
               </TouchableOpacity>
-
-
-            </View>
-          </View>
-
-          {/* Recent Activity */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <View className="flex-row items-center justify-between">
-                          <Text className="font-semibold">
-              Recent Activity
-            </Text>
-              <TouchableOpacity onPress={() => router.push('/(tabs)/transactions' as any)}>
-                <Text className="text-xs text-primary font-medium">
-                  View all
-                </Text>
-              </TouchableOpacity>
-            </View>
-            <View className="gap-3">
-              {transactionManager.getRecentTransactions(3).map((transaction) => {
-                const token = getTokenById(transaction.tokenId);
-                const icon = getTransactionIcon(transaction.type);
-                const color = getTransactionColor(transaction.type);
-                const title = getTransactionTitle(transaction.type);
-
-                // Enhanced display for gas token and metadata
-                const displaySymbol = transaction.metadata?.tokenSymbol || token?.symbol || '';
-                const description = transaction.metadata?.description;
-
-                return (
-                  <View key={transaction.id} className="flex-row items-center justify-between py-2">
-                    <View className="flex-row items-center gap-3">
-                      <View 
-                        className="rounded-full p-1.5" 
-                        style={{ backgroundColor: color + '15' }}
-                      >
-                        <MaterialIcons 
-                          name={icon as any} 
-                          size={14} 
-                          color={color} 
-                        />
-                      </View>
-                      <View className="flex-1">
-                        <Text className="text-sm">
-                          {title} {displaySymbol}
-                        </Text>
-                        {description && (
-                          <Text className="text-xs text-muted-foreground" numberOfLines={1}>
-                            {description}
-                          </Text>
-                        )}
-                        <Text className="text-xs text-muted-foreground">
-                          {formatTimeAgo(transaction.timestamp)}
-                        </Text>
-                      </View>
-                    </View>
-                    <View className="items-end">
-                      {transaction.type !== 'approve' && transaction.type !== 'contract_deployment' && (
-                        <Text className="text-sm">
-                          {transaction.amount.toFixed(transaction.metadata?.tokenDecimals === 6 ? 2 : 4)} {displaySymbol}
-                        </Text>
-                      )}
-                      {transaction.value > 0 && (
-                        <Text className="text-xs text-muted-foreground">
-                          {formatCurrency(transaction.value)}
-                        </Text>
-                      )}
-                      {transaction.gasFee && (
-                        <Text className="text-xs text-orange-600">
-                          Gas: {transaction.gasFee.toFixed(6)} MATIC
-                        </Text>
-                      )}
-                    </View>
-                  </View>
-                );
-              })}
-            </View>
-          </View>
-
-          {/* Quick Stats */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="font-semibold">
-              This Month
-            </Text>
-            <View className="flex-row gap-4">
-              <View className="flex-1 rounded-lg bg-background p-4">
-                <Text className="text-xs text-muted-foreground">
-                  Sent
-                </Text>
-                <Text className="font-bold text-red-500">
-                  $1,250.00
-                </Text>
-              </View>
-              <View className="flex-1 rounded-lg bg-background p-4">
-                <Text className="text-xs text-muted-foreground">
-                  Received
-                </Text>
-                <Text className="font-bold text-green-500">
-                  $3,420.00
-                </Text>
-              </View>
             </View>
           </View>
         </View>

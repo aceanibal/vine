@@ -1,15 +1,15 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { View, ScrollView } from 'react-native';
+import { View, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { WalletStorage } from '~/lib/walletStorage';
-import { ProfileStorage, UserProfile } from '~/lib/profileStorage';
-import { ProfileCollectionModal } from '~/components/ProfileCollectionModal';
+import { useGlobalStore, useActiveChains, useIsActiveChainsLoaded } from '~/lib/stores/useGlobalStore';
+import { dataManager } from '~/lib/dataManager';
+
 import { CustomModal } from '~/components/CustomModal';
 import { Toast } from '~/components/Toast';
 import { RecoveryPhraseModal } from '~/components/RecoveryPhraseModal';
@@ -17,11 +17,11 @@ import * as LocalAuthentication from 'expo-local-authentication';
 
 export default function SettingsScreen() {
   const { colors } = useColorScheme();
+  const currentWallet = useGlobalStore((state) => state.currentWallet);
+  const clearWallets = useGlobalStore((state) => state.clearWallets);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
   const [isLoading, setIsLoading] = useState(true);
-  const [showProfileModal, setShowProfileModal] = useState(false);
-  const [profileModalType, setProfileModalType] = useState<'buy' | 'sell'>('buy');
+
   const [showModal, setShowModal] = useState(false);
   const [modalConfig, setModalConfig] = useState({
     title: '',
@@ -36,6 +36,11 @@ export default function SettingsScreen() {
   });
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [recoveryMnemonic, setRecoveryMnemonic] = useState<string>('');
+  const [isLoadingChains, setIsLoadingChains] = useState(false);
+
+  // Get active chains from global store
+  const activeChains = useActiveChains();
+  const isActiveChainsLoaded = useIsActiveChainsLoaded();
 
   useEffect(() => {
     loadData();
@@ -43,18 +48,45 @@ export default function SettingsScreen() {
 
   const loadData = async () => {
     try {
-      const [address, userProfile] = await Promise.all([
-        WalletStorage.getWalletAddress(),
-        ProfileStorage.getProfile()
-      ]);
-      setWalletAddress(address);
-      setProfile(userProfile);
+      setWalletAddress(currentWallet?.address || null);
     } catch (error) {
       console.error('Failed to load data:', error);
     } finally {
       setIsLoading(false);
     }
   };
+
+  const refreshActiveChains = async () => {
+    if (!currentWallet?.address) return;
+    
+    try {
+      setIsLoadingChains(true);
+      console.log('Settings: Refreshing wallet data...');
+      
+      // Use data manager to refresh wallet data (includes active chains and transactions)
+      await dataManager.initializeWalletData(currentWallet.address);
+      
+      // Get updated active chains from global store
+      const activeChains = useGlobalStore.getState().activeChains;
+      console.log(`Settings: Found ${activeChains.length} active chains`);
+      
+      setToastConfig({
+        message: `Found ${activeChains.length} active chains`,
+        type: 'success'
+      });
+      setShowToast(true);
+    } catch (error) {
+      console.error('Settings: Failed to refresh active chains:', error);
+      setToastConfig({
+        message: 'Failed to refresh active chains',
+        type: 'error'
+      });
+      setShowToast(true);
+    } finally {
+      setIsLoadingChains(false);
+    }
+  };
+
 
   const handleCreateWallet = () => {
     router.push('/(auth)/create-wallet' as any);
@@ -66,31 +98,27 @@ export default function SettingsScreen() {
 
   const handleDeleteWallet = () => {
     setModalConfig({
-      title: 'Delete Wallet & Profile',
-      message: 'Are you sure you want to delete your wallet and profile? This will remove all your wallet data and profile information. This action cannot be undone.',
+      title: 'Delete Wallet',
+      message: 'Are you sure you want to delete your wallet? This will remove all your wallet data. This action cannot be undone.',
       type: 'warning',
       onConfirm: async () => {
         try {
-          // Delete wallet and clear profile data
-          await Promise.all([
-            WalletStorage.deleteWallet(),
-            ProfileStorage.clearProfile()
-          ]);
+          // Delete wallet data
+          clearWallets();
           
           setWalletAddress(null);
-          setProfile(null);
           
           setToastConfig({
-            message: 'Your wallet and profile have been deleted successfully.',
+            message: 'Your wallet has been deleted successfully.',
             type: 'success'
           });
           setShowToast(true);
           // Navigate back to welcome screen
           router.replace('/');
         } catch (error) {
-          console.error('Failed to delete wallet and profile:', error);
+          console.error('Failed to delete wallet:', error);
           setToastConfig({
-            message: 'Failed to delete wallet and profile.',
+            message: 'Failed to delete wallet.',
             type: 'error'
           });
           setShowToast(true);
@@ -103,9 +131,8 @@ export default function SettingsScreen() {
   const handleViewRecoveryPhrase = async () => {
     console.log('View recovery phrase button pressed');
     try {
-      const walletData = await WalletStorage.loadWallet();
-      console.log('Wallet data loaded:', !!walletData);
-      if (!walletData) {
+      console.log('Wallet data loaded:', !!currentWallet);
+      if (!currentWallet) {
         setToastConfig({
           message: 'No wallet data found.',
           type: 'error'
@@ -125,7 +152,7 @@ export default function SettingsScreen() {
         // For simulator testing - bypass biometric check
         if (__DEV__) {
           console.log('Development mode - bypassing biometric for simulator');
-          setRecoveryMnemonic(walletData.mnemonic);
+          setRecoveryMnemonic(currentWallet.mnemonic || '');
           setShowRecoveryModal(true);
           return;
         }
@@ -150,7 +177,7 @@ export default function SettingsScreen() {
       if (result.success) {
         console.log('Authentication successful, showing recovery modal');
         // Show recovery phrase in bottom modal
-        setRecoveryMnemonic(walletData.mnemonic);
+        setRecoveryMnemonic(currentWallet.mnemonic || '');
         setShowRecoveryModal(true);
       } else {
         console.log('Authentication failed');
@@ -189,106 +216,6 @@ export default function SettingsScreen() {
       </View>
       <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">
         <View className="gap-6">
-
-          {/* Profile Section */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="text-lg font-semibold">
-              Profile
-            </Text>
-            
-            {walletAddress ? (
-              <View className="gap-4">
-                {/* Profile Info */}
-                <View className="flex-row items-center gap-4">
-                  <View className="rounded-full bg-primary p-4">
-                    <MaterialIcons name="person" size={32} color="white" />
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-lg font-bold">
-                      Vine User
-                    </Text>
-                    <Text className="text-xs text-muted-foreground">
-                      {walletAddress.slice(0, 10)}...{walletAddress.slice(-8)}
-                    </Text>
-                    <Text className="text-xs text-muted-foreground">
-                      Member since 2024
-                    </Text>
-                  </View>
-                </View>
-
-                {/* Profile Actions */}
-                <View className="gap-3">
-                  <Button 
-                    variant="secondary" 
-                    className="flex-row items-center justify-start gap-3"
-                    onPress={() => router.push('/(tabs)/account-details' as any)}
-                  >
-                    <MaterialIcons name="account-circle" size={20} color={colors.primary} />
-                    <Text>View Account Details</Text>
-                  </Button>
-                  
-                  <Button 
-                    variant="secondary" 
-                    className="flex-row items-center justify-start gap-3"
-                    onPress={() => {
-                      setProfileModalType('buy');
-                      setShowProfileModal(true);
-                    }}
-                  >
-                    <MaterialIcons name="edit" size={20} color={colors.primary} />
-                    <Text>Edit Buy Info</Text>
-                  </Button>
-                  
-                  <Button 
-                    variant="secondary" 
-                    className="flex-row items-center justify-start gap-3"
-                    onPress={() => {
-                      setProfileModalType('sell');
-                      setShowProfileModal(true);
-                    }}
-                  >
-                    <MaterialIcons name="edit" size={20} color={colors.primary} />
-                    <Text>Edit Bank Details</Text>
-                  </Button>
-                </View>
-              </View>
-            ) : (
-              <View className="gap-3">
-                <Text className="text-center text-base text-muted-foreground">
-                  Create a wallet to set up your profile.
-                </Text>
-              </View>
-            )}
-
-            {/* Profile Status */}
-            {profile && (
-              <View className="mt-4 p-3 bg-gray-50 rounded-lg">
-                <Text className="text-xs font-medium mb-2">Profile Status</Text>
-                <View className="gap-1">
-                  <View className="flex-row items-center gap-2">
-                    <MaterialIcons 
-                      name={profile.country && profile.mobileMoneyNumber ? "check-circle" : "info"} 
-                      size={16} 
-                      color={profile.country && profile.mobileMoneyNumber ? colors.primary : colors.grey} 
-                    />
-                    <Text className="text-xs text-muted-foreground">
-                      Buy Info: {profile.country && profile.mobileMoneyNumber ? 'Complete' : 'Incomplete'}
-                    </Text>
-                  </View>
-                  <View className="flex-row items-center gap-2">
-                    <MaterialIcons 
-                      name={profile.country && profile.bankName && profile.branchName && profile.swiftCode && profile.accountNumber ? "check-circle" : "info"} 
-                      size={16} 
-                      color={profile.country && profile.bankName && profile.branchName && profile.swiftCode && profile.accountNumber ? colors.primary : colors.grey} 
-                    />
-                    <Text className="text-xs text-muted-foreground">
-                      Bank Details: {profile.country && profile.bankName && profile.branchName && profile.swiftCode && profile.accountNumber ? 'Complete' : 'Incomplete'}
-                    </Text>
-                  </View>
-                </View>
-              </View>
-            )}
-          </View>
 
           {/* Wallet Section */}
           <View className="gap-4 rounded-xl border border-border bg-card p-6">
@@ -367,23 +294,103 @@ export default function SettingsScreen() {
           {/* Security Section */}
           <View className="gap-4 rounded-xl border border-border bg-card p-6">
             <Text className="font-semibold">
-              Security
+              Wallet Security
             </Text>
             <View className="gap-3">
               <View className="flex-row items-center gap-3">
                 <MaterialIcons name="security" size={20} color={colors.primary} />
-                <Text>Wallet stored securely</Text>
+                <Text>Private keys encrypted</Text>
               </View>
               <View className="flex-row items-center gap-3">
                 <MaterialIcons name="backup" size={20} color={colors.primary} />
-                <Text>Recovery phrase backed up</Text>
+                <Text>Recovery phrase available</Text>
               </View>
               <View className="flex-row items-center gap-3">
                 <MaterialIcons name="lock" size={20} color={colors.primary} />
-                <Text>Encrypted storage</Text>
+                <Text>Secure storage enabled</Text>
               </View>
             </View>
           </View>
+
+          {/* Active Chains Section */}
+          {walletAddress && (
+            <View className="gap-4 rounded-xl border border-border bg-card p-6">
+              <View className="flex-row items-center justify-between">
+                <Text className="font-semibold">
+                  Active Chains
+                </Text>
+                <TouchableOpacity 
+                  onPress={refreshActiveChains}
+                  disabled={isLoadingChains}
+                  className="flex-row items-center gap-1"
+                >
+                  <MaterialIcons 
+                    name="refresh" 
+                    size={16} 
+                    color={isLoadingChains ? colors.grey : colors.primary} 
+                  />
+                  <Text className="text-xs text-primary font-medium">
+                    {isLoadingChains ? 'Loading...' : 'Refresh'}
+                  </Text>
+                </TouchableOpacity>
+              </View>
+              
+              {activeChains.length > 0 ? (
+                <View className="gap-3">
+                  {activeChains.map((chain, index) => (
+                    <View key={index} className="flex-row items-center justify-between p-3 border border-border rounded-lg bg-background">
+                      <View className="flex-row items-center gap-3">
+                        <View className="w-3 h-3 rounded-full bg-green-500" />
+                        <View>
+                          <Text className="font-semibold capitalize">
+                            {chain.chain}
+                          </Text>
+                          <Text className="text-xs text-muted-foreground">
+                            Chain ID: {chain.chain_id}
+                          </Text>
+                          {chain.first_transaction && (
+                            <Text className="text-xs text-muted-foreground">
+                              First tx: {new Date(chain.first_transaction.block_timestamp).toLocaleDateString()}
+                            </Text>
+                          )}
+                        </View>
+                      </View>
+                      <View className="items-end">
+                        <Text className="text-xs text-green-600 font-medium">
+                          Active
+                        </Text>
+                        {chain.last_transaction && (
+                          <Text className="text-xs text-muted-foreground">
+                            Last: {new Date(chain.last_transaction.block_timestamp).toLocaleDateString()}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+                  ))}
+                  <Text className="text-xs text-muted-foreground text-center mt-2">
+                    Tokens are automatically discovered from transaction history on these chains
+                  </Text>
+                </View>
+              ) : (
+                <View className="items-center justify-center py-6">
+                  <MaterialIcons name="account-balance-wallet" size={32} color={colors.grey} />
+                  <Text className="mt-2 text-center text-muted-foreground">
+                    {isActiveChainsLoaded ? 'No active chains found' : 'Active chains not loaded yet'}
+                  </Text>
+                  <Text className="text-xs text-center text-muted-foreground mt-1">
+                    {isActiveChainsLoaded 
+                      ? 'This wallet has no transaction history on any supported chains'
+                      : 'Active chains are loaded when you create or import a wallet'
+                    }
+                  </Text>
+                  <Text className="text-xs text-center text-muted-foreground mt-1">
+                    Use the "Refresh" button to check for active chains
+                  </Text>
+                </View>
+              )}
+            </View>
+          )}
+
 
           {/* App Info Section */}
           <View className="gap-4 rounded-xl border border-border bg-card p-6">
@@ -404,16 +411,7 @@ export default function SettingsScreen() {
         </View>
       </ScrollView>
 
-      {/* Profile Collection Modal */}
-      <ProfileCollectionModal
-        visible={showProfileModal}
-        type={profileModalType}
-        onClose={() => setShowProfileModal(false)}
-        onComplete={() => {
-          setShowProfileModal(false);
-          loadData(); // Reload profile data
-        }}
-      />
+
 
       {/* Custom Modal */}
       <CustomModal
@@ -440,6 +438,7 @@ export default function SettingsScreen() {
         type={toastConfig.type}
         onHide={() => setShowToast(false)}
       />
+
     </SafeAreaView>
   );
 } 

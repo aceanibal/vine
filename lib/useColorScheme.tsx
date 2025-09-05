@@ -8,7 +8,7 @@ import { COLORS } from '~/theme/colors';
 function useColorScheme() {
   const { colorScheme, setColorScheme: setNativeWindColorScheme } = useNativewindColorScheme();
 
-  async function setColorScheme(colorScheme: 'light' | 'dark') {
+  const setColorScheme = React.useCallback(async (colorScheme: 'light' | 'dark') => {
     setNativeWindColorScheme(colorScheme);
     if (Platform.OS !== 'android') return;
     try {
@@ -16,19 +16,22 @@ function useColorScheme() {
     } catch (error) {
       console.error('useColorScheme.tsx", "setColorScheme', error);
     }
-  }
+  }, [setNativeWindColorScheme]);
 
-  function toggleColorScheme() {
+  const toggleColorScheme = React.useCallback(() => {
     return setColorScheme(colorScheme === 'light' ? 'dark' : 'light');
-  }
+  }, [colorScheme, setColorScheme]);
 
-  return {
-    colorScheme: colorScheme ?? 'light',
-    isDarkColorScheme: colorScheme === 'dark',
+  const currentColorScheme = colorScheme ?? 'light';
+  const colors = React.useMemo(() => COLORS[currentColorScheme], [currentColorScheme]);
+
+  return React.useMemo(() => ({
+    colorScheme: currentColorScheme,
+    isDarkColorScheme: currentColorScheme === 'dark',
     setColorScheme,
     toggleColorScheme,
-    colors: COLORS[colorScheme ?? 'light'],
-  };
+    colors,
+  }), [currentColorScheme, setColorScheme, toggleColorScheme, colors]);
 }
 
 /**
