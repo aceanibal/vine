@@ -18,6 +18,8 @@ export default function SendScreen() {
   
   // Get the source screen to determine where to go back
   const source = params.source as string;
+  const paramTokenAddress = params.tokenAddress as string;
+  const paramChainId = params.chainId as string;
   
   const handleBackNavigation = () => {
     if (source === 'transfer') {
@@ -32,9 +34,23 @@ export default function SendScreen() {
   
   // Show all available tokens (not filtered by chain)
   const availableTokens = tokens; // Show all tokens regardless of chain
-  const defaultToken = availableTokens[0]; // Use first available token as default
   
-  const [selectedToken, setSelectedToken] = useState(defaultToken);
+  // Find the token from navigation params, or use first available token as default
+  const findTokenFromParams = () => {
+    if (paramTokenAddress && paramChainId) {
+      const foundToken = availableTokens.find(token => 
+        token.address.toLowerCase() === paramTokenAddress.toLowerCase() && 
+        token.chainId === paramChainId
+      );
+      if (foundToken) {
+        console.log('Send: Found token from params:', foundToken.symbol, 'on', foundToken.chainName);
+        return foundToken;
+      }
+    }
+    return availableTokens[0]; // Fallback to first available token
+  };
+  
+  const [selectedToken, setSelectedToken] = useState<any>(null);
   const [amount, setAmount] = useState('');
   const [recipientAddress, setRecipientAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -49,38 +65,84 @@ export default function SendScreen() {
     }
   }, [currentWallet]);
 
-  // Update selected token when tokens change
+  // Update selected token when tokens change or when params are available
   useEffect(() => {
-    if (availableTokens.length > 0 && !selectedToken) {
-      setSelectedToken(availableTokens[0]);
+    if (availableTokens.length > 0) {
+      const tokenFromParams = findTokenFromParams();
+      if (tokenFromParams) {
+        setSelectedToken(tokenFromParams);
+        console.log('Send: Auto-selected token:', tokenFromParams.symbol, 'from', tokenFromParams.chainName);
+      }
     }
-  }, [availableTokens, selectedToken]);
+  }, [availableTokens, paramTokenAddress, paramChainId]);
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
+    if (amount >= 1000000) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        notation: 'compact',
+        maximumFractionDigits: 2,
+      }).format(amount);
+    } else if (amount >= 1000) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 0,
+      }).format(amount);
+    } else {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    }
+  };
+
+  const formatCompactNumber = (num: number) => {
+    if (num >= 1000000000) {
+      return (num / 1000000000).toFixed(1) + 'B';
+    } else if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M';
+    } else if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
   };
 
   const formatWei = (wei: number) => {
-    if (wei === 0) return '0 wei';
+    if (wei === 0) return '0';
     
     // Convert to gwei for better readability
     const gwei = wei / Math.pow(10, 9);
-    if (gwei >= 1) {
-      return `${gwei.toFixed(2)} gwei`;
+    if (gwei >= 1000) {
+      // Show in compact format for very large gwei values
+      return `${(gwei / 1000).toFixed(1)}K gwei`;
+    } else if (gwei >= 100) {
+      return `${gwei.toFixed(0)} gwei`;
+    } else if (gwei >= 1) {
+      return `${gwei.toFixed(1)} gwei`;
     }
     
-    // Show in wei if less than 1 gwei
-    return `${wei.toLocaleString()} wei`;
+    // Show in wei if less than 1 gwei, but compact format
+    const mwei = wei / Math.pow(10, 6);
+    if (mwei >= 1) {
+      return `${mwei.toFixed(1)} mwei`;
+    }
+    
+    const kwei = wei / Math.pow(10, 3);
+    if (kwei >= 1) {
+      return `${kwei.toFixed(1)} kwei`;
+    }
+    
+    return `${wei} wei`;
   };
 
   const calculateUSDValue = () => {
     const numAmount = parseFloat(amount) || 0;
-    return numAmount * (selectedToken?.price || 0);
+    const tokenPrice = selectedToken?.price?.usd || 0;
+    return numAmount * tokenPrice;
   };
 
   const calculateGasFeeForPriority = (priority: 'slow' | 'standard' | 'fast' = gasPriority) => {
@@ -148,7 +210,7 @@ export default function SendScreen() {
             {token.name}
           </Text>
           <Text className="text-xs text-muted-foreground">
-            {token.price ? formatCurrency(token.price) : 'Price unavailable'} per {token.symbol}
+            {token.price?.usd ? formatCurrency(token.price.usd) : 'Price unavailable'} per {token.symbol}
           </Text>
           <Text className="text-xs text-muted-foreground">
             {token.chainName}
@@ -197,7 +259,7 @@ export default function SendScreen() {
                         {selectedToken.name}
                       </Text>
                       <Text className="text-xs text-muted-foreground">
-                        {selectedToken.price ? formatCurrency(selectedToken.price) : 'Price unavailable'} per {selectedToken.symbol}
+                        {selectedToken.price?.usd ? formatCurrency(selectedToken.price.usd) : 'Price unavailable'} per {selectedToken.symbol}
                       </Text>
                       <Text className="text-xs text-muted-foreground">
                         {selectedToken.chainName}

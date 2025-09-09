@@ -9,6 +9,7 @@ import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore, useActiveChains, useIsActiveChainsLoaded } from '~/lib/stores/useGlobalStore';
 import { dataManager } from '~/lib/dataManager';
+import { moralisApi } from '~/lib/services/moralisApi';
 
 import { CustomModal } from '~/components/CustomModal';
 import { Toast } from '~/components/Toast';
@@ -61,10 +62,10 @@ export default function SettingsScreen() {
     
     try {
       setIsLoadingChains(true);
-      console.log('Settings: Refreshing wallet data...');
+      console.log('Settings: Refreshing active chains via Moralis API...');
       
-      // Use data manager to refresh wallet data (includes active chains and transactions)
-      await dataManager.initializeWalletData(currentWallet.address);
+      // Call Moralis API directly to get wallet active chains
+      await moralisApi.getWalletActiveChains(currentWallet.address);
       
       // Get updated active chains from global store
       const activeChains = useGlobalStore.getState().activeChains;
@@ -226,18 +227,13 @@ export default function SettingsScreen() {
             {walletAddress ? (
               <View className="gap-4">
                 {/* Wallet Info */}
-                <View className="flex-row items-center gap-3">
-                  <View className="rounded-full bg-primary p-3">
-                    <MaterialIcons name="account-balance-wallet" size={24} color="white" />
-                  </View>
-                  <View>
-                    <Text className="font-bold">
-                      Vine Wallet
-                    </Text>
-                    <Text className="text-xs text-muted-foreground">
-                      {walletAddress.slice(0, 10)}...{walletAddress.slice(-8)}
-                    </Text>
-                  </View>
+                <View className="gap-2">
+                  <Text className="font-bold">
+                    Vine Wallet
+                  </Text>
+                  <Text className="text-xs text-muted-foreground break-all">
+                    {walletAddress}
+                  </Text>
                 </View>
 
                 {/* Wallet Actions */}

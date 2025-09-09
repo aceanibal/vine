@@ -2,12 +2,120 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMemo } from 'react';
-import { TokenHashTable, TransactionHashTable } from '../dataManager';
+import { dataManager } from '../dataManager';
 
 // ===== TYPES =====
 
 // Chain ID type definition
 export type ChainId = 'eth' | 'bsc' | 'polygon' | 'arbitrum' | 'optimism' | 'avalanche' | 'fantom' | 'base';
+
+export interface TokenPriceInfo {
+  usd: number;
+  usdFormatted: string;
+  percentChange24h?: number | null;
+  usdPrice24hr?: number | null;
+  usdPrice24hrUsdChange?: number | null;
+  usdPrice24hrPercentChange?: number | null;
+  nativePrice?: {
+    value: string;
+    decimals: number;
+    name: string;
+    symbol: string;
+    address?: string;
+  };
+  exchangeAddress?: string;
+  exchangeName?: string;
+  pairAddress?: string;
+  pairTotalLiquidityUsd?: string;
+  securityScore?: number;
+  lastUpdated: Date;
+  possibleSpam: boolean;
+  verifiedContract: boolean;
+}
+
+export interface TokenInfo {
+  color: string;
+  address: string;
+  name: string;
+  symbol: string;
+  decimals: number;
+  chainId: ChainId;
+  chainName: string;
+  logoURI?: string;
+  isNative: boolean;
+  balance: string;
+  price?: TokenPriceInfo;
+  tokenValue?: string;
+  formattedBalance?: string;
+  addedAt: Date;
+}
+
+export interface TransactionInfo {
+  // Basic transaction data
+  hash: string;
+  from: string;
+  to: string;
+  value: string;
+  chainId: ChainId;
+  status: 'pending' | 'confirmed' | 'failed';
+  blockNumber?: number;
+  timestamp: number;
+  nonce: number;
+  
+  // Gas and fee data
+  gas?: string;
+  gasPrice?: string;
+  gasUsed?: string;
+  transactionFee?: string;
+  cumulativeGasUsed?: string;
+  
+  // Block data
+  blockHash?: string;
+  transactionIndex?: string;
+  
+  // Contract data
+  contractAddress?: string;
+  methodLabel?: string;
+  
+  // Token data
+  tokenAddress?: string;
+  tokenSymbol?: string;
+  tokenDecimals?: number;
+  tokenName?: string;
+  tokenLogo?: string;
+  formattedValue?: string;
+  
+  // Classification
+  category: 'send' | 'receive' | 'contract_interaction' | 'token send' | 'token receive';
+  direction: 'send' | 'receive';
+  transactionType: 'native' | 'erc20' | 'nft' | 'contract';
+  
+  // Metadata
+  summary?: string;
+  possibleSpam?: boolean;
+  isInternal?: boolean;
+  
+  // Transfer data (raw for reference)
+  nativeTransfers?: any[];
+  erc20Transfers?: any[];
+  nftTransfers?: any[];
+}
+
+export interface HashTableSummary {
+  totalCount: number;
+  lastUpdated: Date | null;
+  chains: ChainId[];
+  firstTransactionDate?: Date;
+  lastTransactionDate?: Date;
+}
+
+export interface TokenHashTable {
+  [key: string]: TokenInfo; // key format: "chainId-address"
+}
+
+export interface TransactionHashTable {
+  [key: string]: TransactionInfo; // key format: "chainId-hash"
+}
 
 export interface Wallet {
   address: string;
@@ -40,6 +148,8 @@ export interface AppState {
 export interface ActiveChain {
   chain: string;
   chain_id: string;
+  total_transactions: number; // Total from Moralis API
+  actual_loaded_transactions: number; // Total actually loaded/retrieved
   first_transaction: {
     block_number: string;
     block_timestamp: string;
@@ -69,6 +179,7 @@ export interface GlobalState {
   // ===== TRANSACTION STATE =====
   transactions: TransactionHashTable;
   lastUpdatedTransaction: number | null; // timestamp of the most recent transaction
+  latestBlockNumbers: Record<ChainId, number | null>; // latest block number for each chain
 
   // ===== GAS ESTIMATION STATE =====
   gasPrices: Record<ChainId, GasPrice | null>;
@@ -114,6 +225,9 @@ export interface GlobalState {
   setLastUpdated: (date: Date) => void;
   setOnline: (online: boolean) => void;
   clearError: () => void;
+
+  // ===== DATA REFRESH ACTIONS =====
+  refreshWalletData: () => Promise<void>;
 }
 
 
@@ -136,6 +250,7 @@ export const useGlobalStore = create<GlobalState>()(
       // Transaction state
       transactions: {},
       lastUpdatedTransaction: null,
+      latestBlockNumbers: {} as Record<ChainId, number | null>,
 
       // Gas estimation state
       gasPrices: {} as Record<ChainId, GasPrice | null>,
@@ -295,6 +410,56 @@ export const useGlobalStore = create<GlobalState>()(
       setActiveChainsLoaded: (loaded: boolean) => {
         set({ isActiveChainsLoaded: loaded });
       },
+
+      // ===== DATA REFRESH ACTIONS =====
+      refreshWalletData: async () => {
+        const state = get();
+        const currentWallet = state.currentWallet;
+        
+        if (!currentWallet?.address) {
+          console.log('GlobalStore: No current wallet found for refresh');
+          return;
+        }
+        
+        try {
+          console.log('GlobalStore: Starting wallet data refresh...');
+          
+          // Set loading state
+          set((state) => ({
+            appState: {
+              ...state.appState,
+              isLoading: true,
+              error: null,
+            }
+          }));
+          
+          // Call dataManager to reinitialize wallet data
+          await dataManager.initializeWalletData(currentWallet.address);
+          
+          // Update app state with success
+          set((state) => ({
+            appState: {
+              ...state.appState,
+              isLoading: false,
+              lastUpdated: new Date(),
+            }
+          }));
+          
+          console.log('GlobalStore: Wallet data refresh completed successfully');
+          
+        } catch (error) {
+          console.error('GlobalStore: Failed to refresh wallet data:', error);
+          
+          // Update app state with error
+          set((state) => ({
+            appState: {
+              ...state.appState,
+              isLoading: false,
+              error: error instanceof Error ? error.message : 'Failed to refresh wallet data',
+            }
+          }));
+        }
+      },
     }),
     {
       name: 'global-store',
@@ -308,6 +473,7 @@ export const useGlobalStore = create<GlobalState>()(
         tokens: state.tokens,
         transactions: state.transactions,
         lastUpdatedTransaction: state.lastUpdatedTransaction,
+        latestBlockNumbers: state.latestBlockNumbers,
         // Persist active chains data
         activeChains: state.activeChains,
         isActiveChainsLoaded: state.isActiveChainsLoaded,
@@ -322,6 +488,7 @@ export const useGlobalStore = create<GlobalState>()(
             tokensCount: Object.keys(state.tokens).length,
             transactionsCount: Object.keys(state.transactions).length,
             lastUpdatedTransaction: state.lastUpdatedTransaction,
+            latestBlockNumbers: state.latestBlockNumbers,
             activeChainsCount: state.activeChains.length,
             isActiveChainsLoaded: state.isActiveChainsLoaded,
           });
@@ -346,6 +513,7 @@ export const useAllTokens = () => {
   return useMemo(() => Object.values(tokens), [tokens]);
 };
 
+
 // Transaction selectors
 export const useAllTransactions = () => {
   const transactions = useGlobalStore((state) => state.transactions);
@@ -353,6 +521,7 @@ export const useAllTransactions = () => {
 };
 
 export const useLastUpdatedTransaction = () => useGlobalStore((state) => state.lastUpdatedTransaction);
+export const useLatestBlockNumbers = () => useGlobalStore((state) => state.latestBlockNumbers);
 
 
 // Gas estimation selectors

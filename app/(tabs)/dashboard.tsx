@@ -14,37 +14,69 @@ import { useGlobalStore, useCurrentWallet, useAllTokens, useAllTransactions } fr
 export default function DashboardScreen() {
   const { colors } = useColorScheme();
   const [isRefreshing, setIsRefreshing] = useState(false);
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(true);
 
   // Get wallet and token data from stores
   const currentWallet = useCurrentWallet();
   const addWallet = useGlobalStore((state) => state.addWallet);
   const tokens = useAllTokens();
+  const refreshWalletData = useGlobalStore((state) => state.refreshWalletData);
+  const isLoading = useGlobalStore((state) => state.appState.isLoading);
+  const error = useGlobalStore((state) => state.appState.error);
+  const lastUpdated = useGlobalStore((state) => state.appState.lastUpdated);
   
   // Get recent transactions for display from global store
   const allTransactions = useAllTransactions();
-  const recentTransactions = useMemo(() => allTransactions.slice(0, 5), [allTransactions]);
+  const recentTransactions = useMemo(() => {
+    // Sort transactions by timestamp (newest first) and take the first 5
+    return allTransactions
+      .sort((a, b) => b.timestamp - a.timestamp)
+      .slice(0, 5);
+  }, [allTransactions]);
   
   // Calculate total portfolio value locally
   const totalPortfolioValue = useMemo(() => {
     return tokens.reduce((total, token) => {
-      if (token.balance && token.price) {
+      if (token.balance && token.price?.usd) {
+        const balance = parseFloat(token.balance) / Math.pow(10, token.decimals);
+        return total + (balance * token.price.usd);
+      }
+      // Fallback for legacy price format (if any tokens still use the old number format)
+      if (token.balance && typeof token.price === 'number' && token.price > 0) {
         const balance = parseFloat(token.balance) / Math.pow(10, token.decimals);
         return total + (balance * token.price);
       }
       return total;
     }, 0);
   }, [tokens]);
+
+  // Calculate weighted average portfolio performance
+  const portfolioPerformance = useMemo(() => {
+    let totalValue = 0;
+    let weightedPerformance = 0;
+    
+    tokens.forEach(token => {
+      if (token.balance && token.price?.usd) {
+        const balance = parseFloat(token.balance) / Math.pow(10, token.decimals);
+        const value = balance * token.price.usd;
+        const performance = token.price.percentChange24h || token.price.usdPrice24hrPercentChange || 0;
+        
+        totalValue += value;
+        weightedPerformance += value * performance;
+      }
+    });
+    
+    return totalValue > 0 ? weightedPerformance / totalValue : 0;
+  }, [tokens]);
   
   // Set wallet address when component mounts
   useEffect(() => {
     if (currentWallet?.address) {
       setWalletAddress(currentWallet.address);
-      setIsLoading(false);
+      setIsPageLoading(false);
     } else {
-      setIsLoading(false);
+      setIsPageLoading(false);
     }
   }, [currentWallet]);
 
@@ -54,20 +86,20 @@ export default function DashboardScreen() {
   const onRefresh = async () => {
     try {
       setIsRefreshing(true);
-      console.log('Pull-to-refresh: Refreshing...');
+      console.log('Pull-to-refresh: Refreshing wallet data...');
       
       // Add haptic feedback for better user experience
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       
-      // Just update the last updated time
-      setLastUpdated(new Date());
+      // Call the global store refresh function
+      await refreshWalletData();
       
       // Success haptic feedback
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       
-      console.log('Pull-to-refresh: Refresh completed');
+      console.log('Pull-to-refresh: Wallet data refresh completed');
     } catch (error) {
-      console.error('Pull-to-refresh: Failed to refresh:', error);
+      console.error('Pull-to-refresh: Failed to refresh wallet data:', error);
       // Error haptic feedback
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
     } finally {
@@ -80,15 +112,115 @@ export default function DashboardScreen() {
   };
 
   const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-US', {
-      style: 'currency',
-      currency: 'USD',
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount);
+    if (amount >= 1000000) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        notation: 'compact',
+        maximumFractionDigits: 2,
+      }).format(amount);
+    } else if (amount >= 1000) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 0,
+      }).format(amount);
+    } else {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(amount);
+    }
   };
 
-  // Removed formatNumber function - not used in dashboard
+  const formatPrice = (price: number) => {
+    if (price >= 1000000) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        notation: 'compact',
+        maximumFractionDigits: 2,
+      }).format(price);
+    } else if (price >= 1000) {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        maximumFractionDigits: 2,
+      }).format(price);
+    } else {
+      return new Intl.NumberFormat('en-US', {
+        style: 'currency',
+        currency: 'USD',
+        minimumFractionDigits: 2,
+        maximumFractionDigits: 2,
+      }).format(price);
+    }
+  };
+
+  const formatCompactNumber = (num: number) => {
+    if (num >= 1000000000) {
+      return (num / 1000000000).toFixed(1) + 'B';
+    } else if (num >= 1000000) {
+      return (num / 1000000).toFixed(1) + 'M';
+    } else if (num >= 1000) {
+      return (num / 1000).toFixed(1) + 'K';
+    }
+    return num.toString();
+  };
+
+  const formatPercentage = (percentage: number | null | undefined) => {
+    if (percentage === null || percentage === undefined || isNaN(percentage)) {
+      return null;
+    }
+    const sign = percentage >= 0 ? '+' : '';
+    return `${sign}${percentage.toFixed(2)}%`;
+  };
+
+  const getPercentageColor = (percentage: number | null | undefined) => {
+    if (percentage === null || percentage === undefined || isNaN(percentage)) {
+      return 'text-muted-foreground';
+    }
+    return percentage >= 0 ? 'text-green-600' : 'text-red-600';
+  };
+
+  const formatTokenBalance = (balance: string, decimals: number) => {
+    try {
+      const balanceBigInt = BigInt(balance);
+      const divisor = BigInt(10 ** decimals);
+      const wholePart = balanceBigInt / divisor;
+      const fractionalPart = balanceBigInt % divisor;
+      
+      // Convert to number for easier formatting of large balances
+      const wholePartNumber = Number(wholePart);
+      
+      // For very large balances, use compact notation
+      if (wholePartNumber >= 1000000) {
+        return formatCompactNumber(wholePartNumber);
+      }
+      
+      if (fractionalPart === BigInt(0)) {
+        return wholePart.toString();
+      }
+      
+      const fractionalStr = fractionalPart.toString().padStart(decimals, '0');
+      const trimmedFractional = fractionalStr.replace(/0+$/, '');
+      
+      if (trimmedFractional === '') {
+        return wholePart.toString();
+      }
+      
+      // For balances with decimals, limit decimal places for readability
+      const maxDecimalPlaces = wholePartNumber >= 1000 ? 2 : 4;
+      const limitedFractional = trimmedFractional.substring(0, maxDecimalPlaces);
+      
+      return `${wholePart}.${limitedFractional}`;
+    } catch (error) {
+      console.error('Error formatting token balance:', error);
+      return '0';
+    }
+  };
 
   const formatLastUpdated = (date: Date | null) => {
     if (!date) return '';
@@ -111,14 +243,18 @@ export default function DashboardScreen() {
 
   // Component to display a single token with balance
   const TokenItem = ({ token }: { token: any }) => {
-    // Get all data from global store - no calculations here
-    const formattedBalance = token.formattedBalance || '0';
-    const tokenValue = token.tokenValue || 0;
-    const price = token.price || 0;
+    // Format balance from raw balance and decimals
+    const formattedBalance = formatTokenBalance(token.balance || '0', token.decimals || 18);
+    const tokenValue = parseFloat(token.tokenValue || '0');
+    const priceInfo = token.price; // This should be TokenPriceInfo object
+    const currentPrice = priceInfo?.usd || 0;
+    const percentChange = priceInfo?.percentChange24h || priceInfo?.usdPrice24hrPercentChange;
+    const formattedPercentage = formatPercentage(percentChange);
+    const percentageColor = getPercentageColor(percentChange);
 
     return (
       <TouchableOpacity 
-        className="flex-row items-center justify-between rounded-lg border border-border bg-background p-4"
+        className="flex-row items-center justify-between rounded-lg p-1"
         onPress={() => {
           router.push({
             pathname: '/(tabs)/send',
@@ -133,8 +269,7 @@ export default function DashboardScreen() {
         <View className="flex-row items-center gap-3">
           <TokenIcon
             {...getTokenIconProps(token)}
-            size={20}
-            backgroundColor={getTokenIconProps(token).color + '20'}
+            size={30}
           />
           <View>
             <Text className="text-base font-semibold">
@@ -152,9 +287,21 @@ export default function DashboardScreen() {
           <Text className="text-base font-semibold">
             {formatCurrency(tokenValue)}
           </Text>
-          {price > 0 && (
-            <Text className="text-xs text-muted-foreground">
-              ${price.toFixed(2)}
+          <View className="flex-row items-center gap-1">
+            {currentPrice > 0 && (
+              <Text className="text-xs text-muted-foreground">
+                {formatPrice(currentPrice)}
+              </Text>
+            )}
+            {formattedPercentage && (
+              <Text className={`text-xs font-medium ${percentageColor}`}>
+                {formattedPercentage}
+              </Text>
+            )}
+          </View>
+          {priceInfo?.exchangeName && (
+            <Text className="text-xs text-muted-foreground mt-0.5">
+              via {priceInfo.exchangeName}
             </Text>
           )}
         </View>
@@ -162,7 +309,7 @@ export default function DashboardScreen() {
     );
   };
 
-  if (isLoading) {
+  if (isPageLoading) {
     return (
       <View className="flex-1 items-center justify-center">
         <Text>Loading wallet...</Text>
@@ -194,19 +341,19 @@ export default function DashboardScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-row items-center justify-between p-4 border-b border-border bg-white">
+      <View className="flex-row items-center justify-between px-2 py-4 border-b border-border bg-white">
         <View className="w-6" />
         <Text className="text-lg font-bold">
-          Wallet
+          Vine Wallet
         </Text>
         <View className="w-6" />
       </View>
       <ScrollView 
         className="flex-1 bg-gray-50" 
-        contentContainerClassName="p-4"
+        contentContainerClassName="px-2 py-4"
         refreshControl={
           <RefreshControl
-            refreshing={isRefreshing}
+            refreshing={isRefreshing || isLoading}
             onRefresh={onRefresh}
             tintColor={colors.primary}
             colors={[colors.primary]}
@@ -217,25 +364,30 @@ export default function DashboardScreen() {
         <View className="gap-6">
 
           {/* Total Net Asset Value */}
-          <TouchableOpacity 
-            className="gap-4 rounded-xl border border-border bg-card p-6"
-            onPress={() => router.push('/(tabs)/account-details' as any)}
-          >
+          <View className="gap-4 rounded-xl border border-border bg-card p-6">
             <View className="flex-row items-center justify-between">
               <Text className="text-lg font-semibold">
                 Total Net Asset Value
               </Text>
-              <MaterialIcons name="chevron-right" size={20} color={colors.grey} />
             </View>
             <View className="gap-2">
-              <Text className="text-lg font-bold">
-                {formatCurrency(totalPortfolioValue)}
-              </Text>
+              <View className="flex-row items-center gap-2">
+                <Text className="text-lg font-bold">
+                  {formatCurrency(totalPortfolioValue)}
+                </Text>
+                {formatPercentage(portfolioPerformance) && (
+                  <View className={`px-2 py-1 rounded-full ${portfolioPerformance >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
+                    <Text className={`text-xs font-medium ${getPercentageColor(portfolioPerformance)}`}>
+                      {formatPercentage(portfolioPerformance)}
+                    </Text>
+                  </View>
+                )}
+              </View>
               <Text className="text-xs text-muted-foreground">
-                Portfolio Value
+                Portfolio Value{portfolioPerformance !== 0 ? ' • 24h Change' : ''}
               </Text>
             </View>
-          </TouchableOpacity>
+          </View>
 
           {/* Assets List */}
           <View className="gap-4 rounded-xl border border-border bg-card p-6">
@@ -245,22 +397,27 @@ export default function DashboardScreen() {
               </Text>
               <TouchableOpacity 
                 onPress={onRefresh}
-                disabled={isRefreshing}
+                disabled={isRefreshing || isLoading}
                 className="flex-row items-center gap-1"
               >
                 <MaterialIcons 
                   name="refresh" 
                   size={16} 
-                  color={isRefreshing ? colors.grey : colors.primary} 
+                  color={(isRefreshing || isLoading) ? colors.grey : colors.primary} 
                 />
                 <Text className="text-xs text-primary font-medium">
-                  {isRefreshing ? 'Loading...' : 'Refresh'}
+                  {(isRefreshing || isLoading) ? 'Loading...' : 'Refresh'}
                 </Text>
               </TouchableOpacity>
             </View>
             {lastUpdated && (
               <Text className="text-xs text-muted-foreground text-center">
                 Last updated {formatLastUpdated(lastUpdated)}
+              </Text>
+            )}
+            {error && (
+              <Text className="text-xs text-red-600 text-center mt-1">
+                Error: {error}
               </Text>
             )}
             <View className="gap-3">
@@ -289,8 +446,7 @@ export default function DashboardScreen() {
                 Recent Activity
               </Text>
               <TouchableOpacity onPress={() => {
-                // TODO: Navigate to new transactions screen when implemented
-                console.log('Navigate to transactions screen');
+                router.push('/(tabs)/transactions' as any);
               }}>
                 <Text className="text-xs text-primary font-medium">
                   View all
@@ -302,7 +458,7 @@ export default function DashboardScreen() {
                 recentTransactions.map((tx, index) => (
                   <TouchableOpacity 
                     key={`${tx.hash}-${index}`}
-                    className="flex-row items-center justify-between rounded-lg border border-border bg-background p-4"
+                    className="flex-row items-center justify-between rounded-lg p-2"
                     onPress={() => {
                       console.log('Transaction pressed:', tx.hash);
                       // TODO: Navigate to transaction details
@@ -323,7 +479,7 @@ export default function DashboardScreen() {
                           {tx.summary || `${tx.direction} ${tx.tokenSymbol || 'transaction'}`}
                         </Text>
                         <Text className="text-sm text-muted-foreground">
-                          {new Date(tx.timestamp).toLocaleDateString()}
+                          {new Date(tx.timestamp).toLocaleDateString()} at {new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </Text>
                       </View>
                     </View>

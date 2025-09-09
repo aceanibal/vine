@@ -50,6 +50,12 @@ export default function TabLayout() {
           href: null, // This hides the tab from the bottom navigation
         }}
       />
+      <Tabs.Screen
+        name="transactions"
+        options={{
+          href: null, // This hides the tab from the bottom navigation
+        }}
+      />
 
     </Tabs>
   );
