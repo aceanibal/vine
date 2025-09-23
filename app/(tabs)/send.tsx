@@ -8,7 +8,9 @@ import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { TokenIcon, getTokenIconProps } from '~/components/TokenIcon';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { useAllTokens, useGasPriority, useGlobalStore, useCurrentWallet } from '~/lib/stores/useGlobalStore';
+import { useAllTokens, useCurrentWallet, getNumericChainId } from '~/lib/stores/useGlobalStore';
+// Import the JavaScript module
+const { SPONSORED_CONFIG, SponsoredOrchestrator } = require('~/lib/services/sponsored-orchestrator');
 
 export default function SendScreen() {
   const { colors } = useColorScheme();
@@ -32,8 +34,8 @@ export default function SendScreen() {
     }
   };
   
-  // Show all available tokens (not filtered by chain)
-  const availableTokens = tokens; // Show all tokens regardless of chain
+  // Filter to show only ERC-20 tokens (not native tokens)
+  const availableTokens = tokens.filter(token => !token.isNative);
   
   // Find the token from navigation params, or use first available token as default
   const findTokenFromParams = () => {
@@ -43,11 +45,11 @@ export default function SendScreen() {
         token.chainId === paramChainId
       );
       if (foundToken) {
-        console.log('Send: Found token from params:', foundToken.symbol, 'on', foundToken.chainName);
+        console.log('Send: Found ERC-20 token from params:', foundToken.symbol, 'on', foundToken.chainName);
         return foundToken;
       }
     }
-    return availableTokens[0]; // Fallback to first available token
+    return availableTokens[0]; // Fallback to first available ERC-20 token
   };
   
   const [selectedToken, setSelectedToken] = useState<any>(null);
@@ -55,8 +57,6 @@ export default function SendScreen() {
   const [recipientAddress, setRecipientAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [showTokenModal, setShowTokenModal] = useState(false);
-  const gasPriority = useGasPriority();
-  const setGasPriority = useGlobalStore((state) => state.setGasPriority);
 
   // Component is ready when wallet is available
   useEffect(() => {
@@ -71,7 +71,7 @@ export default function SendScreen() {
       const tokenFromParams = findTokenFromParams();
       if (tokenFromParams) {
         setSelectedToken(tokenFromParams);
-        console.log('Send: Auto-selected token:', tokenFromParams.symbol, 'from', tokenFromParams.chainName);
+        console.log('Send: Auto-selected ERC-20 token:', tokenFromParams.symbol, 'from', tokenFromParams.chainName);
       }
     }
   }, [availableTokens, paramTokenAddress, paramChainId]);
@@ -100,62 +100,13 @@ export default function SendScreen() {
     }
   };
 
-  const formatCompactNumber = (num: number) => {
-    if (num >= 1000000000) {
-      return (num / 1000000000).toFixed(1) + 'B';
-    } else if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + 'M';
-    } else if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'K';
-    }
-    return num.toString();
-  };
-
-  const formatWei = (wei: number) => {
-    if (wei === 0) return '0';
-    
-    // Convert to gwei for better readability
-    const gwei = wei / Math.pow(10, 9);
-    if (gwei >= 1000) {
-      // Show in compact format for very large gwei values
-      return `${(gwei / 1000).toFixed(1)}K gwei`;
-    } else if (gwei >= 100) {
-      return `${gwei.toFixed(0)} gwei`;
-    } else if (gwei >= 1) {
-      return `${gwei.toFixed(1)} gwei`;
-    }
-    
-    // Show in wei if less than 1 gwei, but compact format
-    const mwei = wei / Math.pow(10, 6);
-    if (mwei >= 1) {
-      return `${mwei.toFixed(1)} mwei`;
-    }
-    
-    const kwei = wei / Math.pow(10, 3);
-    if (kwei >= 1) {
-      return `${kwei.toFixed(1)} kwei`;
-    }
-    
-    return `${wei} wei`;
-  };
-
   const calculateUSDValue = () => {
     const numAmount = parseFloat(amount) || 0;
     const tokenPrice = selectedToken?.price?.usd || 0;
     return numAmount * tokenPrice;
   };
 
-  const calculateGasFeeForPriority = (priority: 'slow' | 'standard' | 'fast' = gasPriority) => {
-    // Simple gas fee calculation using global store data
-    const baseGasPrice = 30000000000; // 30 gwei in wei
-    const gasLimit = selectedToken?.isNative ? 21000 : 65000;
-    
-    // Adjust gas price based on priority
-    const multiplier = priority === 'slow' ? 0.8 : priority === 'fast' ? 1.5 : 1.0;
-    return baseGasPrice * gasLimit * multiplier;
-  };
-
-  const handleSend = () => {
+  const handleSend = async () => {
     if (!amount || !recipientAddress || !selectedToken) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
@@ -166,22 +117,65 @@ export default function SendScreen() {
       return;
     }
 
+    if (!currentWallet?.address || !currentWallet?.privateKey) {
+      Alert.alert('Error', 'No wallet available');
+      return;
+    }
+
+    // Check if the token's chain is supported
+    const numericChainId = getNumericChainId(selectedToken.chainId);
+    if (!SponsoredOrchestrator.isChainSupported(numericChainId)) {
+      Alert.alert(
+        'Chain Not Supported', 
+        `Sponsored transactions are currently only supported on Polygon mainnet (Chain ID: ${SPONSORED_CONFIG.chainId}). Please try a different token or chain.`
+      );
+      return;
+    }
+
     setIsLoading(true);
     
-    // Simulate transaction processing
-    setTimeout(() => {
+    try {
+      // Create sponsored orchestrator for the token's chain
+      const orchestrator = new SponsoredOrchestrator(numericChainId, currentWallet.privateKey);
+
+      // Execute sponsored transfer
+      const result = await orchestrator.executeSponsoredTransfer({
+        tokenAddress: selectedToken.address,
+        toAddress: recipientAddress,
+        amount: amount,
+        chainId: numericChainId,
+        privateKey: currentWallet.privateKey,
+      });
+
       setIsLoading(false);
+
+      if (result.success) {
+        Alert.alert(
+          'Transaction Sent',
+          `Sponsored transaction submitted successfully!\n\n${result.transactionHash ? `Hash: ${result.transactionHash.slice(0, 10)}...${result.transactionHash.slice(-8)}\n\n` : ''}Amount: ${amount} ${selectedToken.symbol}\nTo: ${recipientAddress.slice(0, 8)}...${recipientAddress.slice(-6)}\n\n✨ No gas fees! This transaction was sponsored.\n\nYou can track the transaction status in your transaction history.`,
+          [
+            {
+              text: 'OK',
+              onPress: () => handleBackNavigation()
+            }
+          ]
+        );
+      } else {
+        Alert.alert(
+          'Transaction Failed',
+          result.error || 'An unknown error occurred',
+          [{ text: 'OK' }]
+        );
+      }
+    } catch (error: any) {
+      setIsLoading(false);
+      console.error('Sponsored transaction error:', error);
       Alert.alert(
-        'Transaction Sent',
-        `Successfully sent ${amount} ${selectedToken.symbol} to ${recipientAddress.slice(0, 8)}...${recipientAddress.slice(-6)}`,
-        [
-          {
-            text: 'OK',
-            onPress: () => handleBackNavigation()
-          }
-        ]
+        'Transaction Failed',
+        error.message || 'An unexpected error occurred',
+        [{ text: 'OK' }]
       );
-    }, 2000);
+    }
   };
 
   const TokenSelector = ({ token, onSelect }: { token: any; onSelect?: () => void }) => {
@@ -213,7 +207,7 @@ export default function SendScreen() {
             {token.price?.usd ? formatCurrency(token.price.usd) : 'Price unavailable'} per {token.symbol}
           </Text>
           <Text className="text-xs text-muted-foreground">
-            {token.chainName}
+            {token.chainName} • ERC-20
           </Text>
         </View>
         {isSelected && (
@@ -230,17 +224,33 @@ export default function SendScreen() {
           <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
         </TouchableOpacity>
         <Text className="text-lg font-bold">
-          Send
+          Send (Sponsored)
         </Text>
         <View className="w-6" />
       </View>
 
       <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">
         <View className="gap-6">
+          {/* Sponsored Transaction Info */}
+          <View className="rounded-xl border border-green-200 bg-green-50 p-4">
+            <View className="flex-row items-center gap-2 mb-2">
+              <MaterialIcons name="stars" size={16} color="#16a34a" />
+              <Text className="text-sm font-semibold text-green-700">
+                Sponsored Transaction
+              </Text>
+            </View>
+            <Text className="text-xs text-green-600">
+              No gas fees! This transaction is sponsored and completely free for you.
+            </Text>
+            <Text className="text-xs text-green-500 mt-1">
+              Network: Polygon Mainnet (Chain ID: {SPONSORED_CONFIG.chainId})
+            </Text>
+          </View>
+
           {/* Token Selection */}
           <View className="gap-4 rounded-xl border border-border bg-card p-6">
             <Text className="text-lg font-semibold">
-              Token
+              Token (ERC-20 Only)
             </Text>
             <TouchableOpacity 
               onPress={() => availableTokens.length > 0 && setShowTokenModal(true)}
@@ -262,7 +272,7 @@ export default function SendScreen() {
                         {selectedToken.price?.usd ? formatCurrency(selectedToken.price.usd) : 'Price unavailable'} per {selectedToken.symbol}
                       </Text>
                       <Text className="text-xs text-muted-foreground">
-                        {selectedToken.chainName}
+                        {selectedToken.chainName} • ERC-20
                       </Text>
                     </View>
                   </>
@@ -328,38 +338,6 @@ export default function SendScreen() {
             </View>
           </View>
 
-          {/* Gas Priority Selector */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="font-semibold">
-              Gas Priority
-            </Text>
-            <View className="flex-row gap-2">
-              {(['slow', 'standard', 'fast'] as const).map((priority) => (
-                <TouchableOpacity
-                  key={priority}
-                  onPress={() => setGasPriority(priority)}
-                  className={`flex-1 p-3 rounded-lg border ${
-                    gasPriority === priority
-                      ? 'border-primary bg-primary/10'
-                      : 'border-border bg-background'
-                  }`}
-                >
-                  <Text className={`text-center font-medium ${
-                    gasPriority === priority ? 'text-primary' : 'text-foreground'
-                  }`}>
-                    {priority.charAt(0).toUpperCase() + priority.slice(1)}
-                  </Text>
-                  <Text className="text-xs text-center text-muted-foreground mt-1">
-                    {formatWei(calculateGasFeeForPriority(priority))}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
-            <Text className="text-xs text-muted-foreground">
-              Higher priority = faster confirmation, higher cost
-            </Text>
-          </View>
-
           {/* Transaction Summary */}
           <View className="gap-4 rounded-xl border border-border bg-card p-6">
             <Text className="font-semibold">
@@ -384,6 +362,14 @@ export default function SendScreen() {
               </View>
               <View className="flex-row items-center justify-between">
                 <Text className="text-muted-foreground">
+                  Token Type
+                </Text>
+                <Text className="font-semibold">
+                  ERC-20
+                </Text>
+              </View>
+              <View className="flex-row items-center justify-between">
+                <Text className="text-muted-foreground">
                   Value (USD)
                 </Text>
                 <Text className="font-semibold">
@@ -392,18 +378,21 @@ export default function SendScreen() {
               </View>
               <View className="flex-row items-center justify-between">
                 <Text className="text-muted-foreground">
-                  Network Fee ({gasPriority})
+                  Network Fee
                 </Text>
-                <Text className="font-semibold">
-                  {formatWei(calculateGasFeeForPriority(gasPriority))}
-                </Text>
+                <View className="flex-row items-center gap-1">
+                  <MaterialIcons name="stars" size={14} color="#16a34a" />
+                  <Text className="font-semibold text-green-600">
+                    FREE (Sponsored)
+                  </Text>
+                </View>
               </View>
               <View className="border-t border-border pt-3">
                 <View className="flex-row items-center justify-between">
                   <Text className="font-semibold">
-                    Token Value
+                    Total Cost
                   </Text>
-                  <Text className="font-bold">
+                  <Text className="font-bold text-green-600">
                     {formatCurrency(calculateUSDValue())}
                   </Text>
                 </View>
@@ -411,8 +400,8 @@ export default function SendScreen() {
                   <Text className="text-sm text-muted-foreground">
                     + Network Fee
                   </Text>
-                  <Text className="text-sm text-muted-foreground">
-                    {formatWei(calculateGasFeeForPriority(gasPriority))}
+                  <Text className="text-sm text-green-600">
+                    FREE
                   </Text>
                 </View>
               </View>
@@ -424,7 +413,7 @@ export default function SendScreen() {
             size="lg" 
             className="mt-4"
             onPress={handleSend}
-            disabled={isLoading || !amount || !recipientAddress}
+            disabled={isLoading || !amount || !recipientAddress || !selectedToken}
           >
             {isLoading ? (
               <View className="flex-row items-center gap-2">
@@ -433,11 +422,26 @@ export default function SendScreen() {
               </View>
             ) : (
               <View className="flex-row items-center gap-2">
-                <MaterialIcons name="send" size={20} color="white" />
-                <Text>Send {selectedToken?.symbol || 'Token'}</Text>
+                <MaterialIcons name="stars" size={20} color="white" />
+                <Text>Send {selectedToken?.symbol || 'Token'} (FREE)</Text>
               </View>
             )}
           </Button>
+
+          {/* Info about ERC-20 only */}
+          {availableTokens.length === 0 && (
+            <View className="rounded-xl border border-yellow-200 bg-yellow-50 p-4">
+              <View className="flex-row items-center gap-2 mb-2">
+                <MaterialIcons name="info" size={16} color="#d97706" />
+                <Text className="text-sm font-semibold text-yellow-700">
+                  No ERC-20 Tokens Available
+                </Text>
+              </View>
+              <Text className="text-xs text-yellow-600">
+                Sponsored transactions currently only support ERC-20 tokens. Native tokens (ETH, MATIC, etc.) are not supported yet.
+              </Text>
+            </View>
+          )}
         </View>
       </ScrollView>
 
@@ -452,7 +456,7 @@ export default function SendScreen() {
           <View className="bg-white rounded-t-3xl p-6">
             <View className="flex-row items-center justify-between mb-4">
               <Text className="font-bold">
-                Select Token
+                Select ERC-20 Token
               </Text>
               <TouchableOpacity onPress={() => setShowTokenModal(false)}>
                 <MaterialIcons name="close" size={24} color={colors.grey} />
@@ -469,12 +473,12 @@ export default function SendScreen() {
                 ))
               ) : (
                 <View className="items-center justify-center py-8">
-                  <MaterialIcons name="add-circle" size={32} color={colors.grey} />
+                  <MaterialIcons name="info" size={32} color={colors.grey} />
                   <Text className="mt-2 text-center text-muted-foreground">
-                    No tokens available
+                    No ERC-20 tokens available
                   </Text>
                   <Text className="text-xs text-center text-muted-foreground mt-1">
-                    Tokens will appear here when available
+                    Sponsored transactions only support ERC-20 tokens
                   </Text>
                 </View>
               )}
@@ -484,4 +488,4 @@ export default function SendScreen() {
       </Modal>
     </SafeAreaView>
   );
-} 
+}

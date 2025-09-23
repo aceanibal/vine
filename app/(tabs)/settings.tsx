@@ -105,10 +105,9 @@ export default function SettingsScreen() {
       onConfirm: async () => {
         try {
           // Delete wallet data
-          clearWallets();
-          
+          clearWallets();    
           setWalletAddress(null);
-          
+          console.log('Wallet deleted');
           setToastConfig({
             message: 'Your wallet has been deleted successfully.',
             type: 'success'

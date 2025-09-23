@@ -1,4 +1,4 @@
-import { type ChainId } from '../stores/useGlobalStore';
+import { type ChainId, CHAIN_CONFIGS, getHexChainId } from '../stores/useGlobalStore';
 import { useGlobalStore } from '../stores/useGlobalStore';
 
 // ===== TYPES =====
@@ -11,7 +11,7 @@ export interface MoralisConfig {
 export interface ActiveChain {
   chain: string;
   chain_id: string;
-  total_transactions: number; // Total from Moralis API
+  total_transactions: number; // Total activity (transactions + token transfers) from Moralis API
   actual_loaded_transactions: number; // Total actually loaded/retrieved
   first_transaction: {
     block_number: string;
@@ -202,17 +202,11 @@ class MoralisApiService {
     try {
       console.log(`MoralisApi: Getting active chains for ${address}`);
       
-      // Check all major chains
-      const chainsToCheck = [
-        { chainId: '0x1', chainName: 'eth' },
-        { chainId: '0x89', chainName: 'polygon' },
-        { chainId: '0x38', chainName: 'bsc' },
-        { chainId: '0xa4b1', chainName: 'arbitrum' },
-        { chainId: '0xa', chainName: 'optimism' },
-        { chainId: '0xa86a', chainName: 'avalanche' },
-        { chainId: '0xfa', chainName: 'fantom' },
-        { chainId: '0x2105', chainName: 'base' }
-      ];
+      // Check all configured chains from our single source of truth
+      const chainsToCheck = Object.entries(CHAIN_CONFIGS).map(([chainName, config]) => ({
+        chainId: config.hexId,
+        chainName: config.chainId
+      }));
       
       const activeChains: ActiveChain[] = [];
       
@@ -220,21 +214,24 @@ class MoralisApiService {
         try {
           console.log(`MoralisApi: Checking chain ${chainName} (${chainId}) for transactions`);
           
-          // Use stats endpoint to check if chain has transactions
+          // Use stats endpoint to check if chain has transactions or token transfers
           const statsResponse = await this.makeRequest<{
             transactions: { total: string };
+            token_transfers: { total: string };
           }>(`/wallets/${address.toLowerCase()}/stats`, { chain: chainId });
           
           const totalTransactions = parseInt(statsResponse.transactions.total);
+          const totalTokenTransfers = parseInt(statsResponse.token_transfers.total);
+          const totalActivity = totalTransactions + totalTokenTransfers;
           
-          console.log(`MoralisApi: Chain ${chainName} has ${totalTransactions} transactions`);
+          console.log(`MoralisApi: Chain ${chainName} has ${totalTransactions} transactions and ${totalTokenTransfers} token transfers (${totalActivity} total activity)`);
           
-          // Chain is active if it has transactions > 0
-          if (totalTransactions > 0) {
+          // Chain is active if it has transactions OR token transfers > 0
+          if (totalActivity > 0) {
             const activeChain: ActiveChain = {
               chain: chainName,
               chain_id: chainId,
-              total_transactions: totalTransactions,
+              total_transactions: totalActivity, // Store total activity (transactions + token transfers)
               actual_loaded_transactions: 0, // Will be updated when transactions are loaded
               first_transaction: {
                 block_number: "0",
@@ -245,7 +242,7 @@ class MoralisApiService {
             };
             
             activeChains.push(activeChain);
-            console.log(`MoralisApi: Chain ${chainName} is active with ${totalTransactions} transactions`);
+            console.log(`MoralisApi: Chain ${chainName} is active with ${totalActivity} total activity (${totalTransactions} transactions + ${totalTokenTransfers} token transfers)`);
           }
         } catch (chainError) {
           console.warn(`MoralisApi: Failed to check chain ${chainName}:`, chainError);
@@ -479,18 +476,8 @@ class MoralisApiService {
    * Convert Moralis chain string to our ChainId type
    */
   private getChainIdFromMoralis(chain: string): ChainId {
-    const chainMap: Record<string, ChainId> = {
-      'eth': 'eth',
-      'polygon': 'polygon',
-      'bsc': 'bsc',
-      'arbitrum': 'arbitrum',
-      'optimism': 'optimism',
-      'avalanche': 'avalanche',
-      'fantom': 'fantom',
-      'base': 'base',
-    };
-    
-    return chainMap[chain] || 'polygon'; // Default to polygon
+    // Use centralized chain configs - chain string should match our ChainId
+    return (chain in CHAIN_CONFIGS) ? (chain as ChainId) : 'sepolia'; // Default to sepolia for testing
   }
 
   /**
@@ -691,7 +678,12 @@ class MoralisApiService {
    * Get wrapped native token contract address for a specific chain
    */
   private getWrappedNativeTokenAddress(chain: string): string | null {
-    const wrappedTokenAddresses: Record<string, string> = {
+    // Check if chain exists in our centralized config first
+    if (!(chain in CHAIN_CONFIGS)) {
+      return null;
+    }
+    
+    const wrappedTokenAddresses: Record<ChainId, string> = {
       // Ethereum - WETH
       'eth': '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
       // Polygon - WMATIC
@@ -708,27 +700,19 @@ class MoralisApiService {
       'fantom': '0x21be370D5312f44cB42ce377BC9b8a0cEF1A4C83',
       // Base - WETH
       'base': '0x4200000000000000000000000000000000000006',
+      // Sepolia - WETH (Testnet)
+      'sepolia': '0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14',
     };
     
-    return wrappedTokenAddresses[chain] || null;
+    return wrappedTokenAddresses[chain as ChainId] || null;
   }
 
   /**
    * Convert Moralis chain name to hex chain ID for API calls
    */
   private getChainHexFromMoralisChain(chain: string): string | null {
-    const chainHexMap: Record<string, string> = {
-      'eth': '0x1',
-      'polygon': '0x89',
-      'bsc': '0x38',
-      'arbitrum': '0xa4b1',
-      'optimism': '0xa',
-      'avalanche': '0xa86a',
-      'fantom': '0xfa',
-      'base': '0x2105',
-    };
-    
-    return chainHexMap[chain] || null;
+    // Use centralized chain configs
+    return (chain in CHAIN_CONFIGS) ? getHexChainId(chain as ChainId) : null;
   }
 
   /**

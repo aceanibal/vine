@@ -7,7 +7,27 @@ import { dataManager } from '../dataManager';
 // ===== TYPES =====
 
 // Chain ID type definition
-export type ChainId = 'eth' | 'bsc' | 'polygon' | 'arbitrum' | 'optimism' | 'avalanche' | 'fantom' | 'base';
+export type ChainId = 'eth' | 'bsc' | 'polygon' | 'arbitrum' | 'optimism' | 'avalanche' | 'fantom' | 'base' | 'sepolia';
+
+// Chain configuration interface
+export interface ChainConfig {
+  chainId: ChainId;
+  name: string;
+  numericId: number;
+  hexId: string;
+  isTestnet?: boolean;
+}
+
+// Centralized chain configurations - Single source of truth
+export const CHAIN_CONFIGS: Record<ChainId, ChainConfig> = {
+  polygon: {
+    chainId: 'polygon',
+    name: 'Polygon',
+    numericId: 137,
+    hexId: '0x89',
+    isTestnet: false,
+  },
+};
 
 export interface TokenPriceInfo {
   usd: number;
@@ -117,6 +137,27 @@ export interface TransactionHashTable {
   [key: string]: TransactionInfo; // key format: "chainId-hash"
 }
 
+export interface PendingTransaction {
+  id: string;
+  hash: string;
+  from: string;
+  to: string;
+  value: string;
+  chainId: ChainId;
+  tokenAddress?: string;
+  tokenSymbol?: string;
+  isNative: boolean;
+  status: 'pending' | 'confirmed' | 'failed';
+  timestamp: number;
+  gasLimit: string;
+  gasPrice: string;
+  nonce: number;
+}
+
+export interface PendingTransactionHashTable {
+  [key: string]: PendingTransaction; // key format: "chainId-hash"
+}
+
 export interface Wallet {
   address: string;
   privateKey: string;
@@ -181,6 +222,9 @@ export interface GlobalState {
   lastUpdatedTransaction: number | null; // timestamp of the most recent transaction
   latestBlockNumbers: Record<ChainId, number | null>; // latest block number for each chain
 
+  // ===== PENDING TRANSACTION STATE =====
+  pendingTransactions: PendingTransactionHashTable;
+
   // ===== GAS ESTIMATION STATE =====
   gasPrices: Record<ChainId, GasPrice | null>;
   gasEstimates: Record<string, GasEstimate | null>;
@@ -213,6 +257,13 @@ export interface GlobalState {
 
   // ===== TRANSACTION ACTIONS =====
   getTransactions: () => any[];
+
+  // ===== PENDING TRANSACTION ACTIONS =====
+  addPendingTransaction: (transaction: PendingTransaction) => void;
+  updatePendingTransactionStatus: (chainId: ChainId, hash: string, status: 'pending' | 'confirmed' | 'failed') => void;
+  removePendingTransaction: (chainId: ChainId, hash: string) => void;
+  getPendingTransactions: () => PendingTransaction[];
+  getPendingTransactionsByChain: (chainId: ChainId) => PendingTransaction[];
 
   // ===== ACTIVE CHAINS ACTIONS =====
   setActiveChains: (chains: ActiveChain[]) => void;
@@ -251,6 +302,9 @@ export const useGlobalStore = create<GlobalState>()(
       transactions: {},
       lastUpdatedTransaction: null,
       latestBlockNumbers: {} as Record<ChainId, number | null>,
+
+      // Pending transaction state
+      pendingTransactions: {},
 
       // Gas estimation state
       gasPrices: {} as Record<ChainId, GasPrice | null>,
@@ -309,6 +363,15 @@ export const useGlobalStore = create<GlobalState>()(
           currentWallet: null,
           isWalletCreated: false,
           isUnlocked: false,
+          tokens: {},
+          transactions: {},
+          lastUpdatedTransaction: null,
+          latestBlockNumbers: {} as Record<ChainId, number | null>,
+          activeChains: [],
+          isActiveChainsLoaded: false,
+          pendingTransactions: {},
+          gasPrices: {} as Record<ChainId, GasPrice | null>,
+          gasEstimates: {}
         });
       },
 
@@ -348,6 +411,54 @@ export const useGlobalStore = create<GlobalState>()(
       // ===== TRANSACTION ACTIONS =====
       getTransactions: () => {
         return Object.values(get().transactions);
+      },
+
+      // ===== PENDING TRANSACTION ACTIONS =====
+      addPendingTransaction: (transaction: PendingTransaction) => {
+        console.log('GlobalStore: Adding pending transaction:', transaction.hash);
+        set((state) => ({
+          pendingTransactions: {
+            ...state.pendingTransactions,
+            [transaction.id]: transaction,
+          },
+        }));
+      },
+
+      updatePendingTransactionStatus: (chainId: ChainId, hash: string, status: 'pending' | 'confirmed' | 'failed') => {
+        const transactionId = `${chainId}-${hash}`;
+        console.log('GlobalStore: Updating pending transaction status:', transactionId, status);
+        set((state) => {
+          const transaction = state.pendingTransactions[transactionId];
+          if (transaction) {
+            return {
+              pendingTransactions: {
+                ...state.pendingTransactions,
+                [transactionId]: {
+                  ...transaction,
+                  status,
+                },
+              },
+            };
+          }
+          return state;
+        });
+      },
+
+      removePendingTransaction: (chainId: ChainId, hash: string) => {
+        const transactionId = `${chainId}-${hash}`;
+        console.log('GlobalStore: Removing pending transaction:', transactionId);
+        set((state) => {
+          const { [transactionId]: removed, ...remaining } = state.pendingTransactions;
+          return { pendingTransactions: remaining };
+        });
+      },
+
+      getPendingTransactions: () => {
+        return Object.values(get().pendingTransactions);
+      },
+
+      getPendingTransactionsByChain: (chainId: ChainId) => {
+        return Object.values(get().pendingTransactions).filter(tx => tx.chainId === chainId);
       },
 
 
@@ -474,6 +585,8 @@ export const useGlobalStore = create<GlobalState>()(
         transactions: state.transactions,
         lastUpdatedTransaction: state.lastUpdatedTransaction,
         latestBlockNumbers: state.latestBlockNumbers,
+        // Persist pending transactions
+        pendingTransactions: state.pendingTransactions,
         // Persist active chains data
         activeChains: state.activeChains,
         isActiveChainsLoaded: state.isActiveChainsLoaded,
@@ -489,6 +602,7 @@ export const useGlobalStore = create<GlobalState>()(
             transactionsCount: Object.keys(state.transactions).length,
             lastUpdatedTransaction: state.lastUpdatedTransaction,
             latestBlockNumbers: state.latestBlockNumbers,
+            pendingTransactionsCount: Object.keys(state.pendingTransactions || {}).length,
             activeChainsCount: state.activeChains.length,
             isActiveChainsLoaded: state.isActiveChainsLoaded,
           });
@@ -499,6 +613,45 @@ export const useGlobalStore = create<GlobalState>()(
     }
   )
 );
+
+// ===== UTILITY FUNCTIONS =====
+
+/**
+ * Get numeric chain ID from ChainId
+ */
+export const getNumericChainId = (chainId: ChainId): number => {
+  return CHAIN_CONFIGS[chainId]?.numericId || 137; // Default to Polygon
+};
+
+/**
+ * Get hex chain ID from ChainId
+ */
+export const getHexChainId = (chainId: ChainId): string => {
+  return CHAIN_CONFIGS[chainId]?.hexId || '0x89'; // Default to Polygon
+};
+
+/**
+ * Get chain configuration from ChainId
+ */
+export const getChainConfig = (chainId: ChainId): ChainConfig => {
+  return CHAIN_CONFIGS[chainId] || CHAIN_CONFIGS.polygon; // Default to Polygon
+};
+
+/**
+ * Get ChainId from numeric chain ID
+ */
+export const getChainIdFromNumeric = (numericId: number): ChainId => {
+  const chainEntry = Object.entries(CHAIN_CONFIGS).find(([, config]) => config.numericId === numericId);
+  return chainEntry ? (chainEntry[0] as ChainId) : 'polygon';
+};
+
+/**
+ * Get ChainId from hex chain ID
+ */
+export const getChainIdFromHex = (hexId: string): ChainId => {
+  const chainEntry = Object.entries(CHAIN_CONFIGS).find(([, config]) => config.hexId === hexId);
+  return chainEntry ? (chainEntry[0] as ChainId) : 'polygon';
+};
 
 // ===== SELECTORS =====
 
@@ -523,6 +676,20 @@ export const useAllTransactions = () => {
 export const useLastUpdatedTransaction = () => useGlobalStore((state) => state.lastUpdatedTransaction);
 export const useLatestBlockNumbers = () => useGlobalStore((state) => state.latestBlockNumbers);
 
+// Pending transaction selectors
+export const usePendingTransactions = () => {
+  const pendingTransactions = useGlobalStore((state) => state.pendingTransactions);
+  return useMemo(() => Object.values(pendingTransactions), [pendingTransactions]);
+};
+
+export const usePendingTransactionsByChain = (chainId: ChainId) => {
+  const pendingTransactions = useGlobalStore((state) => state.pendingTransactions);
+  return useMemo(
+    () => Object.values(pendingTransactions).filter(tx => tx.chainId === chainId),
+    [pendingTransactions, chainId]
+  );
+};
+
 
 // Gas estimation selectors
 export const useGasPrice = (chainId: ChainId, priority?: 'slow' | 'standard' | 'fast') => 
@@ -540,32 +707,3 @@ export const useAppError = () => useGlobalStore((state) => state.appState.error)
 export const useAppOnline = () => useGlobalStore((state) => state.appState.isOnline);
 export const useLastUpdated = () => useGlobalStore((state) => state.appState.lastUpdated);
 
-// ===== UTILITY FUNCTIONS =====
-
-/**
- * Format token balance with proper decimals
- */
-function formatTokenBalance(balance: string, decimals: number): string {
-  try {
-    const balanceBigInt = BigInt(balance);
-    const divisor = BigInt(10 ** decimals);
-    const wholePart = balanceBigInt / divisor;
-    const fractionalPart = balanceBigInt % divisor;
-    
-    if (fractionalPart === BigInt(0)) {
-      return wholePart.toString();
-    }
-    
-    const fractionalStr = fractionalPart.toString().padStart(decimals, '0');
-    const trimmedFractional = fractionalStr.replace(/0+$/, '');
-    
-    if (trimmedFractional === '') {
-      return wholePart.toString();
-    }
-    
-    return `${wholePart}.${trimmedFractional}`;
-  } catch (error) {
-    console.error('Error formatting token balance:', error);
-    return '0';
-  }
-}

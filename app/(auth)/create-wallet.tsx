@@ -16,6 +16,7 @@ import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore } from '~/lib/stores/useGlobalStore';
 import { CustomModal } from '~/components/CustomModal';
+import { dataManager } from '~/lib/dataManager';
 
 const ROOT_STYLE = { flex: 1 };
 
@@ -81,6 +82,10 @@ export default function CreateWalletScreen() {
       addWallet(walletData);
       console.log('Wallet saved to Zustand store:', wallet.address);
       
+      // Initialize wallet data (fetch chains, transactions, tokens, prices)
+      console.log('Initializing wallet data...');
+      await dataManager.initializeWalletData(wallet.address);
+      console.log('Wallet data initialization complete');
       
       // Show success with custom modal and formatted address
       const formattedAddress = `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`;
