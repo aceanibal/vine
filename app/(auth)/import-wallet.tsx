@@ -16,7 +16,6 @@ import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore } from '~/lib/stores/useGlobalStore';
 import { CustomModal } from '~/components/CustomModal';
-import { dataManager } from '~/lib/dataManager';
 
 const ROOT_STYLE = { flex: 1 };
 
@@ -86,10 +85,7 @@ export default function ImportWalletScreen() {
       addWallet(walletData);
       console.log('Imported wallet saved to Zustand store:', wallet.address);
       
-      // Initialize wallet data (fetch chains, transactions, tokens, prices)
-      console.log('Initializing wallet data...');
-      await dataManager.initializeWalletData(wallet.address);
-      console.log('Wallet data initialization complete');
+      // XRBG branch: No external data initialization
       
       // Format address for display
       const formattedAddress = `${wallet.address.slice(0, 6)}...${wallet.address.slice(-4)}`;

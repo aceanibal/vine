@@ -1,62 +1,31 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { View, ScrollView, TouchableOpacity, TextInput, Alert, Modal } from 'react-native';
+import { router } from 'expo-router';
+import { View, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
-import { TokenIcon, getTokenIconProps } from '~/components/TokenIcon';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { useAllTokens, useCurrentWallet, getNumericChainId } from '~/lib/stores/useGlobalStore';
+import { useCurrentWallet } from '~/lib/stores/useGlobalStore';
+import { usePredefinedToken, useDefaultChainIdNumeric } from '~/lib/stores/useGlobalStore';
 // Import the JavaScript module
 const { SPONSORED_CONFIG, SponsoredOrchestrator } = require('~/lib/services/sponsored-orchestrator');
 
 export default function SendScreen() {
   const { colors } = useColorScheme();
-  const tokens = useAllTokens();
   const currentWallet = useCurrentWallet();
-  const params = useLocalSearchParams();
-  
-  // Get the source screen to determine where to go back
-  const source = params.source as string;
-  const paramTokenAddress = params.tokenAddress as string;
-  const paramChainId = params.chainId as string;
+  const predefinedToken = usePredefinedToken();
+  const defaultChainIdNumeric = useDefaultChainIdNumeric();
   
   const handleBackNavigation = () => {
-    if (source === 'transfer') {
-      router.push('/(tabs)/transfer' as any);
-    } else if (source === 'dashboard') {
-      router.push('/(tabs)/dashboard' as any);
-    } else {
-      // Default fallback
-      router.back();
-    }
+    router.back();
   };
   
-  // Filter to show only ERC-20 tokens (not native tokens)
-  const availableTokens = tokens.filter(token => !token.isNative);
-  
-  // Find the token from navigation params, or use first available token as default
-  const findTokenFromParams = () => {
-    if (paramTokenAddress && paramChainId) {
-      const foundToken = availableTokens.find(token => 
-        token.address.toLowerCase() === paramTokenAddress.toLowerCase() && 
-        token.chainId === paramChainId
-      );
-      if (foundToken) {
-        console.log('Send: Found ERC-20 token from params:', foundToken.symbol, 'on', foundToken.chainName);
-        return foundToken;
-      }
-    }
-    return availableTokens[0]; // Fallback to first available ERC-20 token
-  };
-  
-  const [selectedToken, setSelectedToken] = useState<any>(null);
+  const [selectedToken, setSelectedToken] = useState<any>(predefinedToken);
   const [amount, setAmount] = useState('');
   const [recipientAddress, setRecipientAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showTokenModal, setShowTokenModal] = useState(false);
 
   // Component is ready when wallet is available
   useEffect(() => {
@@ -65,16 +34,13 @@ export default function SendScreen() {
     }
   }, [currentWallet]);
 
-  // Update selected token when tokens change or when params are available
+  // Initialize from predefined token when available
   useEffect(() => {
-    if (availableTokens.length > 0) {
-      const tokenFromParams = findTokenFromParams();
-      if (tokenFromParams) {
-        setSelectedToken(tokenFromParams);
-        console.log('Send: Auto-selected ERC-20 token:', tokenFromParams.symbol, 'from', tokenFromParams.chainName);
-      }
+    if (predefinedToken) {
+      setSelectedToken(predefinedToken);
+      console.log('Send: Using predefined token:', predefinedToken.symbol);
     }
-  }, [availableTokens, paramTokenAddress, paramChainId]);
+  }, [predefinedToken]);
 
   const formatCurrency = (amount: number) => {
     if (amount >= 1000000) {
@@ -100,11 +66,7 @@ export default function SendScreen() {
     }
   };
 
-  const calculateUSDValue = () => {
-    const numAmount = parseFloat(amount) || 0;
-    const tokenPrice = selectedToken?.price?.usd || 0;
-    return numAmount * tokenPrice;
-  };
+  const calculateUSDValue = () => 0; // No price data in XRBG branch
 
   const handleSend = async () => {
     if (!amount || !recipientAddress || !selectedToken) {
@@ -122,8 +84,8 @@ export default function SendScreen() {
       return;
     }
 
-    // Check if the token's chain is supported
-    const numericChainId = getNumericChainId(selectedToken.chainId);
+    // Use default chain id from store
+    const numericChainId = defaultChainIdNumeric || 137;
     if (!SponsoredOrchestrator.isChainSupported(numericChainId)) {
       Alert.alert(
         'Chain Not Supported', 
@@ -178,44 +140,7 @@ export default function SendScreen() {
     }
   };
 
-  const TokenSelector = ({ token, onSelect }: { token: any; onSelect?: () => void }) => {
-    const iconProps = getTokenIconProps(token);
-    const isSelected = selectedToken?.address === token.address;
-    
-    return (
-      <TouchableOpacity
-        onPress={() => {
-          setSelectedToken(token);
-          if (onSelect) onSelect();
-        }}
-        className={`flex-row items-center gap-3 p-3 rounded-lg border ${
-          isSelected
-            ? 'border-primary bg-primary/10' 
-            : 'border-border bg-background'
-        }`}
-      >
-        <TokenIcon
-          {...iconProps}
-          size={20}
-          backgroundColor={iconProps.color + '20'}
-        />
-        <View className="flex-1">
-          <Text className="font-semibold">
-            {token.name}
-          </Text>
-          <Text className="text-xs text-muted-foreground">
-            {token.price?.usd ? formatCurrency(token.price.usd) : 'Price unavailable'} per {token.symbol}
-          </Text>
-          <Text className="text-xs text-muted-foreground">
-            {token.chainName} • ERC-20
-          </Text>
-        </View>
-        {isSelected && (
-          <MaterialIcons name="check-circle" size={20} color={colors.primary} />
-        )}
-      </TouchableOpacity>
-    );
-  };
+  // No token selector in XRBG branch
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -247,44 +172,13 @@ export default function SendScreen() {
             </Text>
           </View>
 
-          {/* Token Selection */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="text-lg font-semibold">
-              Token (ERC-20 Only)
-            </Text>
-            <TouchableOpacity 
-              onPress={() => availableTokens.length > 0 && setShowTokenModal(true)}
-              className="flex-row items-center justify-between p-4 border border-border rounded-lg bg-background"
-            >
-              <View className="flex-row items-center gap-3">
-                {selectedToken && (
-                  <>
-                    <TokenIcon
-                      {...getTokenIconProps(selectedToken)}
-                      size={20}
-                      backgroundColor={getTokenIconProps(selectedToken).color + '20'}
-                    />
-                    <View>
-                      <Text className="font-semibold">
-                        {selectedToken.name}
-                      </Text>
-                      <Text className="text-xs text-muted-foreground">
-                        {selectedToken.price?.usd ? formatCurrency(selectedToken.price.usd) : 'Price unavailable'} per {selectedToken.symbol}
-                      </Text>
-                      <Text className="text-xs text-muted-foreground">
-                        {selectedToken.chainName} • ERC-20
-                      </Text>
-                    </View>
-                  </>
-                )}
-              </View>
-              <View className="flex-row items-center gap-2">
-                <Text className="text-muted-foreground">
-                  Change
-                </Text>
-                <MaterialIcons name="chevron-right" size={20} color={colors.grey} />
-              </View>
-            </TouchableOpacity>
+          {/* Token Info (predefined) */}
+          <View className="gap-2 rounded-xl border border-border bg-card p-6">
+            <Text className="text-lg font-semibold">Token</Text>
+            <View className="flex-row items-center justify-between">
+              <Text className="font-semibold">{selectedToken?.name || 'Token'}</Text>
+              <Text className="text-xs text-muted-foreground">{selectedToken?.symbol || ''}</Text>
+            </View>
           </View>
 
           {/* Amount Input */}
@@ -294,13 +188,6 @@ export default function SendScreen() {
             </Text>
             <View className="gap-3">
               <View className="flex-row items-center gap-3">
-                {selectedToken && (
-                  <TokenIcon
-                    {...getTokenIconProps(selectedToken)}
-                    size={20}
-                    backgroundColor={getTokenIconProps(selectedToken).color + '20'}
-                  />
-                )}
                 <View className="flex-1">
                   <TextInput
                     value={amount}
@@ -357,7 +244,7 @@ export default function SendScreen() {
                   Network
                 </Text>
                 <Text className="font-semibold">
-                  {selectedToken?.chainName || ''}
+                  Polygon
                 </Text>
               </View>
               <View className="flex-row items-center justify-between">
@@ -428,64 +315,22 @@ export default function SendScreen() {
             )}
           </Button>
 
-          {/* Info about ERC-20 only */}
-          {availableTokens.length === 0 && (
+          {/* Info */}
+          {!selectedToken && (
             <View className="rounded-xl border border-yellow-200 bg-yellow-50 p-4">
               <View className="flex-row items-center gap-2 mb-2">
                 <MaterialIcons name="info" size={16} color="#d97706" />
                 <Text className="text-sm font-semibold text-yellow-700">
-                  No ERC-20 Tokens Available
+                  Token not configured
                 </Text>
               </View>
               <Text className="text-xs text-yellow-600">
-                Sponsored transactions currently only support ERC-20 tokens. Native tokens (ETH, MATIC, etc.) are not supported yet.
+                Please configure a predefined token in the app settings.
               </Text>
             </View>
           )}
         </View>
       </ScrollView>
-
-      {/* Token Selection Modal */}
-      <Modal
-        visible={showTokenModal}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setShowTokenModal(false)}
-      >
-        <View className="flex-1 bg-black/50 justify-end">
-          <View className="bg-white rounded-t-3xl p-6">
-            <View className="flex-row items-center justify-between mb-4">
-              <Text className="font-bold">
-                Select ERC-20 Token
-              </Text>
-              <TouchableOpacity onPress={() => setShowTokenModal(false)}>
-                <MaterialIcons name="close" size={24} color={colors.grey} />
-              </TouchableOpacity>
-            </View>
-            <View className="gap-3">
-              {availableTokens.length > 0 ? (
-                availableTokens.map((token) => (
-                  <TokenSelector 
-                    key={token.address} 
-                    token={token} 
-                    onSelect={() => setShowTokenModal(false)}
-                  />
-                ))
-              ) : (
-                <View className="items-center justify-center py-8">
-                  <MaterialIcons name="info" size={32} color={colors.grey} />
-                  <Text className="mt-2 text-center text-muted-foreground">
-                    No ERC-20 tokens available
-                  </Text>
-                  <Text className="text-xs text-center text-muted-foreground mt-1">
-                    Sponsored transactions only support ERC-20 tokens
-                  </Text>
-                </View>
-              )}
-            </View>
-          </View>
-        </View>
-      </Modal>
     </SafeAreaView>
   );
 }

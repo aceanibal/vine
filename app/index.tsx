@@ -8,7 +8,6 @@ import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useCurrentWallet, useIsWalletCreated, useGlobalStore } from '~/lib/stores/useGlobalStore';
-import { dataManager } from '~/lib/dataManager';
 
 const ROOT_STYLE: ViewStyle = { flex: 1 };
 
@@ -38,15 +37,6 @@ export default function WelcomeConsentScreen() {
     console.log('Is wallet created:', isWalletCreated);
     
     if (hasWallet && currentWallet?.address) {
-      console.log('Initializing wallet data...');
-      try {
-        await dataManager.initializeWalletData(currentWallet.address);
-        console.log('Wallet data initialized successfully');
-      } catch (error) {
-        console.error('Failed to initialize wallet data:', error);
-        // Continue to dashboard even if data manager fails
-      }
-      
       console.log('Redirecting to dashboard');
       // Use a small delay to ensure navigation is safe
       setTimeout(() => {

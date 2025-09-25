@@ -7,9 +7,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { useGlobalStore, useActiveChains, useIsActiveChainsLoaded } from '~/lib/stores/useGlobalStore';
-import { dataManager } from '~/lib/dataManager';
-import { moralisApi } from '~/lib/services/moralisApi';
+import { useGlobalStore } from '~/lib/stores/useGlobalStore';
 
 import { CustomModal } from '~/components/CustomModal';
 import { Toast } from '~/components/Toast';
@@ -39,10 +37,6 @@ export default function SettingsScreen() {
   const [recoveryMnemonic, setRecoveryMnemonic] = useState<string>('');
   const [isLoadingChains, setIsLoadingChains] = useState(false);
 
-  // Get active chains from global store
-  const activeChains = useActiveChains();
-  const isActiveChainsLoaded = useIsActiveChainsLoaded();
-
   useEffect(() => {
     loadData();
   }, []);
@@ -58,34 +52,9 @@ export default function SettingsScreen() {
   };
 
   const refreshActiveChains = async () => {
-    if (!currentWallet?.address) return;
-    
-    try {
-      setIsLoadingChains(true);
-      console.log('Settings: Refreshing active chains via Moralis API...');
-      
-      // Call Moralis API directly to get wallet active chains
-      await moralisApi.getWalletActiveChains(currentWallet.address);
-      
-      // Get updated active chains from global store
-      const activeChains = useGlobalStore.getState().activeChains;
-      console.log(`Settings: Found ${activeChains.length} active chains`);
-      
-      setToastConfig({
-        message: `Found ${activeChains.length} active chains`,
-        type: 'success'
-      });
-      setShowToast(true);
-    } catch (error) {
-      console.error('Settings: Failed to refresh active chains:', error);
-      setToastConfig({
-        message: 'Failed to refresh active chains',
-        type: 'error'
-      });
-      setShowToast(true);
-    } finally {
-      setIsLoadingChains(false);
-    }
+    // XRBG branch: Active chains feature removed
+    setToastConfig({ message: 'Active chains not available in this version', type: 'info' });
+    setShowToast(true);
   };
 
 
@@ -307,84 +276,7 @@ export default function SettingsScreen() {
             </View>
           </View>
 
-          {/* Active Chains Section */}
-          {walletAddress && (
-            <View className="gap-4 rounded-xl border border-border bg-card p-6">
-              <View className="flex-row items-center justify-between">
-                <Text className="font-semibold">
-                  Active Chains
-                </Text>
-                <TouchableOpacity 
-                  onPress={refreshActiveChains}
-                  disabled={isLoadingChains}
-                  className="flex-row items-center gap-1"
-                >
-                  <MaterialIcons 
-                    name="refresh" 
-                    size={16} 
-                    color={isLoadingChains ? colors.grey : colors.primary} 
-                  />
-                  <Text className="text-xs text-primary font-medium">
-                    {isLoadingChains ? 'Loading...' : 'Refresh'}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-              
-              {activeChains.length > 0 ? (
-                <View className="gap-3">
-                  {activeChains.map((chain, index) => (
-                    <View key={index} className="flex-row items-center justify-between p-3 border border-border rounded-lg bg-background">
-                      <View className="flex-row items-center gap-3">
-                        <View className="w-3 h-3 rounded-full bg-green-500" />
-                        <View>
-                          <Text className="font-semibold capitalize">
-                            {chain.chain}
-                          </Text>
-                          <Text className="text-xs text-muted-foreground">
-                            Chain ID: {chain.chain_id}
-                          </Text>
-                          {chain.first_transaction && (
-                            <Text className="text-xs text-muted-foreground">
-                              First tx: {new Date(chain.first_transaction.block_timestamp).toLocaleDateString()}
-                            </Text>
-                          )}
-                        </View>
-                      </View>
-                      <View className="items-end">
-                        <Text className="text-xs text-green-600 font-medium">
-                          Active
-                        </Text>
-                        {chain.last_transaction && (
-                          <Text className="text-xs text-muted-foreground">
-                            Last: {new Date(chain.last_transaction.block_timestamp).toLocaleDateString()}
-                          </Text>
-                        )}
-                      </View>
-                    </View>
-                  ))}
-                  <Text className="text-xs text-muted-foreground text-center mt-2">
-                    Tokens are automatically discovered from transaction history on these chains
-                  </Text>
-                </View>
-              ) : (
-                <View className="items-center justify-center py-6">
-                  <MaterialIcons name="account-balance-wallet" size={32} color={colors.grey} />
-                  <Text className="mt-2 text-center text-muted-foreground">
-                    {isActiveChainsLoaded ? 'No active chains found' : 'Active chains not loaded yet'}
-                  </Text>
-                  <Text className="text-xs text-center text-muted-foreground mt-1">
-                    {isActiveChainsLoaded 
-                      ? 'This wallet has no transaction history on any supported chains'
-                      : 'Active chains are loaded when you create or import a wallet'
-                    }
-                  </Text>
-                  <Text className="text-xs text-center text-muted-foreground mt-1">
-                    Use the "Refresh" button to check for active chains
-                  </Text>
-                </View>
-              )}
-            </View>
-          )}
+          {/* Active Chains Section - removed in XRBG branch */}
 
 
           {/* App Info Section */}

@@ -9,12 +9,11 @@ import * as Clipboard from 'expo-clipboard';
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { useCurrentWallet, useAllTokens } from '~/lib/stores/useGlobalStore';
+import { useCurrentWallet } from '~/lib/stores/useGlobalStore';
 
 export default function ReceiveScreen() {
   const { colors } = useColorScheme();
   const currentWallet = useCurrentWallet();
-  const tokens = useAllTokens();
   const params = useLocalSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   
@@ -175,29 +174,7 @@ export default function ReceiveScreen() {
             </Button>
           </View>
 
-          {/* Supported Tokens */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="font-semibold">
-              Supported Tokens (Polygon)
-            </Text>
-            <View className="gap-3">
-              {tokens.map((token) => (
-                <View key={`${token.address}-${token.chainId}`} className="flex-row items-center gap-3">
-                  <View 
-                    className="rounded-full p-2" 
-                    style={{ backgroundColor: (token.color || '#666') + '20' }}
-                  >
-                    <MaterialIcons 
-                      name="account-balance-wallet" 
-                      size={16} 
-                      color={token.color || '#666'} 
-                    />
-                  </View>
-                  <Text>{token.name} ({token.symbol})</Text>
-                </View>
-              ))}
-            </View>
-          </View>
+          
 
           {/* Security Tips */}
           <View className="gap-4 rounded-xl border border-border bg-card p-6">

@@ -9,7 +9,7 @@ import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { TokenIcon, getTokenIconProps } from '~/components/TokenIcon';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { useGlobalStore, useCurrentWallet, useAllTokens, useAllTransactions } from '~/lib/stores/useGlobalStore';
+import { useGlobalStore, useCurrentWallet } from '~/lib/stores/useGlobalStore';
 
 export default function DashboardScreen() {
   const { colors } = useColorScheme();
@@ -20,14 +20,16 @@ export default function DashboardScreen() {
   // Get wallet and token data from stores
   const currentWallet = useCurrentWallet();
   const addWallet = useGlobalStore((state) => state.addWallet);
-  const tokens = useAllTokens();
+  // XRBG branch: tokens are not stored in global state; default to empty list
+  const tokens: any[] = [];
   const refreshWalletData = useGlobalStore((state) => state.refreshWalletData);
   const isLoading = useGlobalStore((state) => state.appState.isLoading);
   const error = useGlobalStore((state) => state.appState.error);
   const lastUpdated = useGlobalStore((state) => state.appState.lastUpdated);
   
   // Get recent transactions for display from global store
-  const allTransactions = useAllTransactions();
+  // XRBG branch: transactions are not stored in global state; default to empty list
+  const allTransactions: any[] = [];
   const recentTransactions = useMemo(() => {
     // Sort transactions by timestamp (newest first) and take the first 5
     return allTransactions
