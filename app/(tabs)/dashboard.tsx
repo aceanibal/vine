@@ -19,68 +19,77 @@ export default function DashboardScreen() {
 
   // Get wallet and token data from stores
   const currentWallet = useCurrentWallet();
-  const addWallet = useGlobalStore((state) => state.addWallet);
-  // XRBG branch: tokens are not stored in global state; default to empty list
-  const tokens: any[] = [];
+  const predefinedToken = useGlobalStore((state) => state.predefinedToken);
+  const tokenBalance = useGlobalStore((state) => state.tokenBalance);
   const refreshWalletData = useGlobalStore((state) => state.refreshWalletData);
+  const fetchTransactionData = useGlobalStore((state) => state.fetchTransactionData);
   const isLoading = useGlobalStore((state) => state.appState.isLoading);
   const error = useGlobalStore((state) => state.appState.error);
   const lastUpdated = useGlobalStore((state) => state.appState.lastUpdated);
   
+  // Debug logging to see what we have
+  console.log('Dashboard Debug:', {
+    hasCurrentWallet: !!currentWallet,
+    hasPredefinedToken: !!predefinedToken,
+    hasTokenBalance: !!tokenBalance,
+    tokenBalance: tokenBalance,
+    predefinedToken: predefinedToken
+  });
+  
   // Get recent transactions for display from global store
-  // XRBG branch: transactions are not stored in global state; default to empty list
-  const allTransactions: any[] = [];
+  const allTransfers = useGlobalStore((state) => state.allTransfers);
   const recentTransactions = useMemo(() => {
-    // Sort transactions by timestamp (newest first) and take the first 5
-    return allTransactions
-      .sort((a, b) => b.timestamp - a.timestamp)
+    // Sort transfers by block number (newest first) and take the first 5
+    return allTransfers
+      .sort((a, b) => b.blockNumber - a.blockNumber)
       .slice(0, 5);
-  }, [allTransactions]);
+  }, [allTransfers]);
   
-  // Calculate total portfolio value locally
+  // Calculate total portfolio value using predefined token
   const totalPortfolioValue = useMemo(() => {
-    return tokens.reduce((total, token) => {
-      if (token.balance && token.price?.usd) {
-        const balance = parseFloat(token.balance) / Math.pow(10, token.decimals);
-        return total + (balance * token.price.usd);
+    if (!predefinedToken) {
+      return 0;
+    }
+    
+    // Use decimal balance if available, otherwise fall back to parsing hex
+    const rawBalance = tokenBalance?.balance?.tokenBalanceDecimal || tokenBalance?.balance?.tokenBalance;
+    const price = typeof (predefinedToken as any).price === 'number' ? (predefinedToken as any).price : 121;
+    
+    // Parse numeric balance from decimal string (already normalized by alchemy proxy)
+    let balanceNumber = 0;
+    try {
+      if (typeof rawBalance === 'string') {
+        const rawBig = BigInt(rawBalance);
+        balanceNumber = Number(rawBig) / Math.pow(10, predefinedToken.decimals);
       }
-      // Fallback for legacy price format (if any tokens still use the old number format)
-      if (token.balance && typeof token.price === 'number' && token.price > 0) {
-        const balance = parseFloat(token.balance) / Math.pow(10, token.decimals);
-        return total + (balance * token.price);
-      }
-      return total;
-    }, 0);
-  }, [tokens]);
+    } catch (_e) {
+      balanceNumber = 0;
+    }
+    
+    const value = balanceNumber * price;
+    return Number.isFinite(value) ? value : 0;
+  }, [predefinedToken, tokenBalance]);
 
-  // Calculate weighted average portfolio performance
+  // Calculate portfolio performance (simplified for single token)
   const portfolioPerformance = useMemo(() => {
-    let totalValue = 0;
-    let weightedPerformance = 0;
-    
-    tokens.forEach(token => {
-      if (token.balance && token.price?.usd) {
-        const balance = parseFloat(token.balance) / Math.pow(10, token.decimals);
-        const value = balance * token.price.usd;
-        const performance = token.price.percentChange24h || token.price.usdPrice24hrPercentChange || 0;
-        
-        totalValue += value;
-        weightedPerformance += value * performance;
-      }
-    });
-    
-    return totalValue > 0 ? weightedPerformance / totalValue : 0;
-  }, [tokens]);
+    // For now, return 0 as we don't have 24h change data for the predefined token
+    return 0;
+  }, []);
   
-  // Set wallet address when component mounts
+  // Set wallet address when component mounts and fetch transaction data
   useEffect(() => {
     if (currentWallet?.address) {
       setWalletAddress(currentWallet.address);
       setIsPageLoading(false);
+      
+      // Fetch transaction data when wallet is available
+      fetchTransactionData().catch((error) => {
+        console.error('Failed to fetch transaction data on mount:', error);
+      });
     } else {
       setIsPageLoading(false);
     }
-  }, [currentWallet]);
+  }, [currentWallet, fetchTransactionData]);
 
   // Check if wallet exists
   const hasWallet = !!walletAddress;
@@ -93,8 +102,11 @@ export default function DashboardScreen() {
       // Add haptic feedback for better user experience
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       
-      // Call the global store refresh function
-      await refreshWalletData();
+      // Call both refresh functions
+      await Promise.all([
+        refreshWalletData(),
+        fetchTransactionData()
+      ]);
       
       // Success haptic feedback
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
@@ -243,16 +255,29 @@ export default function DashboardScreen() {
     }
   };
 
-  // Component to display a single token with balance
-  const TokenItem = ({ token }: { token: any }) => {
-    // Format balance from raw balance and decimals
-    const formattedBalance = formatTokenBalance(token.balance || '0', token.decimals || 18);
-    const tokenValue = parseFloat(token.tokenValue || '0');
-    const priceInfo = token.price; // This should be TokenPriceInfo object
-    const currentPrice = priceInfo?.usd || 0;
-    const percentChange = priceInfo?.percentChange24h || priceInfo?.usdPrice24hrPercentChange;
-    const formattedPercentage = formatPercentage(percentChange);
-    const percentageColor = getPercentageColor(percentChange);
+  // Component to display the predefined token with balance
+  const PredefinedTokenItem = () => {
+    if (!predefinedToken) {
+      return null;
+    }
+    
+    // Use decimal balance if available, otherwise fall back to parsing hex
+    const rawBalance = tokenBalance?.balance?.tokenBalanceDecimal || tokenBalance?.balance?.tokenBalance || '0';
+    const price = typeof (predefinedToken as any).price === 'number' ? (predefinedToken as any).price : 121;
+    
+    // Format balance string for display
+    const formattedBalance = formatTokenBalance(rawBalance, predefinedToken.decimals);
+    
+    // Numeric balance for value calculation (uses normalized decimal string)
+    let numericBalance = 0;
+    try {
+      const rawBig = BigInt(rawBalance);
+      numericBalance = Number(rawBig) / Math.pow(10, predefinedToken.decimals);
+    } catch (_e) {
+      numericBalance = 0;
+    }
+    
+    const tokenValue = numericBalance * price;
 
     return (
       <TouchableOpacity 
@@ -261,8 +286,8 @@ export default function DashboardScreen() {
           router.push({
             pathname: '/(tabs)/send',
             params: { 
-              tokenAddress: token.address,
-              chainId: token.chainId,
+              tokenAddress: predefinedToken.address,
+              chainId: 137, // Polygon mainnet
               source: 'dashboard'
             }
           } as any);
@@ -270,18 +295,22 @@ export default function DashboardScreen() {
       >
         <View className="flex-row items-center gap-3">
           <TokenIcon
-            {...getTokenIconProps(token)}
+            {...getTokenIconProps({
+              symbol: predefinedToken.symbol,
+              name: predefinedToken.name,
+              address: predefinedToken.address
+            })}
             size={30}
           />
           <View>
             <Text className="text-base font-semibold">
-              {token.symbol}
+              {predefinedToken.symbol}
             </Text>
             <Text className="text-xs text-muted-foreground">
-              {token.name} • {token.chainName}
+              {predefinedToken.name} • Polygon
             </Text>
             <Text className="text-xs text-muted-foreground">
-              {formattedBalance} {token.symbol}
+              {formattedBalance} {predefinedToken.symbol}
             </Text>
           </View>
         </View>
@@ -290,22 +319,10 @@ export default function DashboardScreen() {
             {formatCurrency(tokenValue)}
           </Text>
           <View className="flex-row items-center gap-1">
-            {currentPrice > 0 && (
-              <Text className="text-xs text-muted-foreground">
-                {formatPrice(currentPrice)}
-              </Text>
-            )}
-            {formattedPercentage && (
-              <Text className={`text-xs font-medium ${percentageColor}`}>
-                {formattedPercentage}
-              </Text>
-            )}
-          </View>
-          {priceInfo?.exchangeName && (
-            <Text className="text-xs text-muted-foreground mt-0.5">
-              via {priceInfo.exchangeName}
+            <Text className="text-xs text-muted-foreground">
+              {formatPrice(price)}
             </Text>
-          )}
+          </View>
         </View>
       </TouchableOpacity>
     );
@@ -375,7 +392,7 @@ export default function DashboardScreen() {
             <View className="gap-2">
               <View className="flex-row items-center gap-2">
                 <Text className="text-lg font-bold">
-                  {formatCurrency(totalPortfolioValue)}
+                  {isNaN(totalPortfolioValue) ? '$0.00' : formatCurrency(totalPortfolioValue)}
                 </Text>
                 {formatPercentage(portfolioPerformance) && (
                   <View className={`px-2 py-1 rounded-full ${portfolioPerformance >= 0 ? 'bg-green-100' : 'bg-red-100'}`}>
@@ -423,16 +440,16 @@ export default function DashboardScreen() {
               </Text>
             )}
             <View className="gap-3">
-              {tokens.length > 0 ? tokens.map((token) => (
-                <TokenItem key={`${token.address}-${token.chainId}`} token={token} />
-              )) : (
+              {predefinedToken ? (
+                <PredefinedTokenItem />
+              ) : (
                 <View className="items-center justify-center py-8">
                   <MaterialIcons name="account-balance-wallet" size={32} color={colors.grey} />
                   <Text className="mt-2 text-center text-muted-foreground">
-                    No tokens found
+                    No token configured
                   </Text>
                   <Text className="text-xs text-center text-muted-foreground mt-1">
-                    Tokens will appear here when you have transaction history
+                    Token will appear here when configured
                   </Text>
                 </View>
               )}
@@ -457,46 +474,57 @@ export default function DashboardScreen() {
             </View>
             <View className="gap-3">
               {recentTransactions.length > 0 ? (
-                recentTransactions.map((tx, index) => (
-                  <TouchableOpacity 
-                    key={`${tx.hash}-${index}`}
-                    className="flex-row items-center justify-between rounded-lg p-2"
-                    onPress={() => {
-                      console.log('Transaction pressed:', tx.hash);
-                      // TODO: Navigate to transaction details
-                    }}
-                  >
-                    <View className="flex-row items-center flex-1">
-                      <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
-                        tx.direction === 'receive' ? 'bg-green-100' : 'bg-red-100'
-                      }`}>
-                        <MaterialIcons 
-                          name={tx.direction === 'receive' ? 'arrow-downward' : 'arrow-upward'} 
-                          size={20} 
-                          color={tx.direction === 'receive' ? '#10B981' : '#EF4444'} 
-                        />
+                recentTransactions.map((transfer, index) => {
+                  const isReceive = transfer.to.toLowerCase() === currentWallet?.address?.toLowerCase();
+                  const isSend = transfer.from.toLowerCase() === currentWallet?.address?.toLowerCase();
+                  const direction = isReceive ? 'receive' : 'send';
+                  
+                  // Format the transfer value
+                  const formattedValue = predefinedToken ? 
+                    formatTokenBalance(transfer.rawValue, predefinedToken.decimals) : 
+                    transfer.value.toString();
+                  
+                  return (
+                    <TouchableOpacity 
+                      key={`${transfer.hash}-${index}`}
+                      className="flex-row items-center justify-between rounded-lg p-2"
+                      onPress={() => {
+                        console.log('Transaction pressed:', transfer.hash);
+                        // TODO: Navigate to transaction details
+                      }}
+                    >
+                      <View className="flex-row items-center flex-1">
+                        <View className={`w-10 h-10 rounded-full items-center justify-center mr-3 ${
+                          direction === 'receive' ? 'bg-green-100' : 'bg-red-100'
+                        }`}>
+                          <MaterialIcons 
+                            name={direction === 'receive' ? 'arrow-downward' : 'arrow-upward'} 
+                            size={20} 
+                            color={direction === 'receive' ? '#10B981' : '#EF4444'} 
+                          />
+                        </View>
+                        <View className="flex-1">
+                          <Text className="font-medium text-foreground">
+                            {direction === 'receive' ? 'Received' : 'Sent'} {predefinedToken?.symbol || 'tokens'}
+                          </Text>
+                          <Text className="text-sm text-muted-foreground">
+                            {transfer.timestamp ? new Date(transfer.timestamp).toLocaleDateString() : 'Unknown date'}
+                          </Text>
+                        </View>
                       </View>
-                      <View className="flex-1">
-                        <Text className="font-medium text-foreground">
-                          {tx.summary || `${tx.direction} ${tx.tokenSymbol || 'transaction'}`}
+                      <View className="items-end">
+                        <Text className={`font-medium ${
+                          direction === 'receive' ? 'text-green-600' : 'text-red-600'
+                        }`}>
+                          {direction === 'receive' ? '+' : '-'}{formattedValue} {predefinedToken?.symbol || ''}
                         </Text>
-                        <Text className="text-sm text-muted-foreground">
-                          {new Date(tx.timestamp).toLocaleDateString()} at {new Date(tx.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        <Text className="text-xs text-muted-foreground">
+                          Block #{transfer.blockNumber}
                         </Text>
                       </View>
-                    </View>
-                    <View className="items-end">
-                      <Text className={`font-medium ${
-                        tx.direction === 'receive' ? 'text-green-600' : 'text-red-600'
-                      }`}>
-                        {tx.direction === 'receive' ? '+' : '-'}{tx.formattedValue || '0'} {tx.tokenSymbol || ''}
-                      </Text>
-                      <Text className="text-xs text-muted-foreground">
-                        {tx.status}
-                      </Text>
-                    </View>
-                  </TouchableOpacity>
-                ))
+                    </TouchableOpacity>
+                  );
+                })
               ) : (
                 <View className="items-center justify-center py-8">
                   <MaterialIcons name="history" size={32} color={colors.grey} />

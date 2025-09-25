@@ -19,6 +19,7 @@ export interface PredefinedTokenConfig {
   symbol: string;
   name: string;
   decimals: number;
+  price: number; // Token price in USD
 }
 
 
@@ -27,6 +28,54 @@ export interface AppState {
   error: string | null;
   lastUpdated: Date | null;
   isOnline: boolean;
+}
+
+// Transaction data interfaces
+export interface Transfer {
+  blockNumber: number;
+  hash: string;
+  from: string;
+  to: string;
+  value: number;
+  asset: string;
+  category: string;
+  timestamp: string | null;
+  rawValue: string;
+}
+
+export interface TokenBalance {
+  walletAddress: string;
+  tokenContract: string;
+  balance: {
+    contractAddress: string;
+    tokenBalance: string;
+    tokenBalanceDecimal?: string; // Normalized decimal string from alchemy proxy
+  };
+  error: string | null;
+}
+
+export interface TransactionData {
+  transfers: {
+    toAddress: {
+      count: number;
+      transfers: Transfer[];
+      pageKey: string | null;
+    };
+    fromAddress: {
+      count: number;
+      transfers: Transfer[];
+      pageKey: string | null;
+    };
+    total: number;
+  };
+  tokenBalances: TokenBalance;
+  metadata: {
+    address: string;
+    fromBlock: string;
+    toBlock: string;
+    timestamp: string;
+    tokenAddress: string;
+  };
 }
 
 
@@ -43,6 +92,12 @@ export interface GlobalState {
   // ===== APP CONFIG (SINGLE TOKEN) =====
   defaultChainIdNumeric: number; // e.g., 137 for Polygon mainnet
   predefinedToken: PredefinedTokenConfig | null;
+  backendURL: string;
+
+  // ===== TRANSACTION DATA =====
+  transactionData: TransactionData | null;
+  allTransfers: Transfer[]; // Combined and sorted transfers
+  tokenBalance: TokenBalance | null;
 
   // ===== APP STATE =====
   appState: AppState;
@@ -66,6 +121,11 @@ export interface GlobalState {
   setOnline: (online: boolean) => void;
   clearError: () => void;
 
+  // ===== TRANSACTION DATA ACTIONS =====
+  setBackendURL: (url: string) => void;
+  setTransactionData: (data: TransactionData) => void;
+  fetchTransactionData: () => Promise<void>;
+
   // ===== DATA REFRESH ACTIONS =====
   refreshWalletData: () => Promise<void>;
 }
@@ -86,7 +146,19 @@ export const useGlobalStore = create<GlobalState>()(
 
       // App config (single token)
       defaultChainIdNumeric: 137, // Default to Polygon mainnet
-      predefinedToken: null,
+      predefinedToken: {
+        address: '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
+        symbol: 'USDC',
+        name: 'USD Coin',
+        decimals: 6,
+        price: 121,
+      },
+      backendURL: 'https://cpprhb1jz6.execute-api.us-east-1.amazonaws.com',
+
+      // Transaction data
+      transactionData: null,
+      allTransfers: [],
+      tokenBalance: null,
 
       // App state
       appState: {
@@ -190,7 +262,83 @@ export const useGlobalStore = create<GlobalState>()(
         }));
       },
 
- 
+      // ===== TRANSACTION DATA ACTIONS =====
+      setBackendURL: (url: string) => {
+        set({ backendURL: url });
+      },
+
+      setTransactionData: (data: TransactionData) => {
+        // Combine and sort all transfers
+        const allTransfers = [
+          ...data.transfers.toAddress.transfers,
+          ...data.transfers.fromAddress.transfers,
+        ].sort((a, b) => b.blockNumber - a.blockNumber); // Sort by block number descending
+
+        set({
+          transactionData: data,
+          allTransfers,
+          tokenBalance: data.tokenBalances,
+        });
+      },
+
+      fetchTransactionData: async () => {
+        const state = get();
+        const currentWallet = state.currentWallet;
+        const predefinedToken = state.predefinedToken;
+        const backendURL = state.backendURL;
+        
+        if (!currentWallet?.address || !predefinedToken?.address) {
+          console.log('GlobalStore: Missing wallet address or predefined token for transaction data fetch');
+          return;
+        }
+        
+        try {
+          console.log('GlobalStore: Fetching transaction data...');
+          
+          // Set loading state
+          set((state) => ({
+            appState: {
+              ...state.appState,
+              isLoading: true,
+              error: null,
+            }
+          }));
+
+          const url = `${backendURL}/alchemy-proxy?address=${currentWallet.address}&tokenAddress=${predefinedToken.address}`;
+          
+          const response = await fetch(url);
+          if (!response.ok) {
+            throw new Error(`HTTP error! status: ${response.status}`);
+          }
+          
+          const data: TransactionData = await response.json();
+          
+          // Update the store with the fetched data
+          get().setTransactionData(data);
+          
+          set((state) => ({
+            appState: {
+              ...state.appState,
+              isLoading: false,
+              lastUpdated: new Date(),
+            }
+          }));
+          
+          console.log('GlobalStore: Transaction data fetched successfully');
+          
+        } catch (error) {
+          console.error('GlobalStore: Failed to fetch transaction data:', error);
+          
+          set((state) => ({
+            appState: {
+              ...state.appState,
+              isLoading: false,
+              error: error instanceof Error ? error.message : 'Failed to fetch transaction data',
+            }
+          }));
+        }
+      },
+
       // ===== DATA REFRESH ACTIONS =====
       refreshWalletData: async () => {
         const state = get();
@@ -249,18 +397,36 @@ export const useGlobalStore = create<GlobalState>()(
         // Persist app config (single token)
         defaultChainIdNumeric: state.defaultChainIdNumeric,
         predefinedToken: state.predefinedToken,
-        // Persist token and transaction hash tables
-
+        backendURL: state.backendURL,
+        // Persist transaction data
+        transactionData: state.transactionData,
+        allTransfers: state.allTransfers,
+        tokenBalance: state.tokenBalance,
       }),
       onRehydrateStorage: () => (state) => {
         console.log('GlobalStore: Rehydration completed');
         if (state) {
+          // Ensure predefined token is set if it's missing or missing price
+          if (!state.predefinedToken) {
+            console.log('GlobalStore: Setting predefined token after rehydration');
+            state.predefinedToken = {
+              address: '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
+              symbol: 'USDC',
+              name: 'USD Coin',
+              decimals: 6,
+              price: 121,
+            };
+          } else if (typeof state.predefinedToken.price !== 'number') {
+            console.log('GlobalStore: Setting predefined token price after rehydration');
+            state.predefinedToken.price = 121;
+          }
+          
           console.log('GlobalStore: Rehydrated state:', {
             walletsCount: state.wallets.length,
             currentWallet: state.currentWallet?.address,
             isWalletCreated: state.isWalletCreated,
-            defaultChainIdNumeric: (state as any).defaultChainIdNumeric,
-            hasPredefinedToken: !!(state as any).predefinedToken,
+            defaultChainIdNumeric: state.defaultChainIdNumeric,
+            hasPredefinedToken: !!state.predefinedToken,
           });
           // Mark as hydrated
           state._hasHydrated = true;
@@ -289,4 +455,10 @@ export const useAppLoading = () => useGlobalStore((state) => state.appState.isLo
 export const useAppError = () => useGlobalStore((state) => state.appState.error);
 export const useAppOnline = () => useGlobalStore((state) => state.appState.isOnline);
 export const useLastUpdated = () => useGlobalStore((state) => state.appState.lastUpdated);
+
+// Transaction data selectors
+export const useBackendURL = () => useGlobalStore((state) => state.backendURL);
+export const useTransactionData = () => useGlobalStore((state) => state.transactionData);
+export const useAllTransfers = () => useGlobalStore((state) => state.allTransfers);
+export const useTokenBalance = () => useGlobalStore((state) => state.tokenBalance);
 

@@ -7,27 +7,34 @@ import { useState, useMemo } from 'react';
 import { Text } from '~/components/nativewindui/Text';
 import { TokenIcon, getTokenIconProps } from '~/components/TokenIcon';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { useAllTransactions, type TransactionInfo } from '~/lib/stores/useGlobalStore';
+import { useAllTransfers, useCurrentWallet, usePredefinedToken } from '~/lib/stores/useGlobalStore';
 
 export default function TransactionsScreen() {
   const { colors } = useColorScheme();
   const [selectedFilter, setSelectedFilter] = useState<'all' | 'send' | 'receive'>('all');
 
-  // Get all transactions from global store
-  const allTransactions = useAllTransactions();
+  // Get all transfers from global store
+  const allTransfers = useAllTransfers();
+  const currentWallet = useCurrentWallet();
+  const predefinedToken = usePredefinedToken();
 
   // Filter transactions
   const filteredTransactions = useMemo(() => {
-    let filtered = allTransactions;
+    let filtered = allTransfers;
 
     // Apply direction filter
     if (selectedFilter !== 'all') {
-      filtered = filtered.filter(tx => tx.direction === selectedFilter);
+      filtered = filtered.filter(transfer => {
+        const isReceive = transfer.to.toLowerCase() === currentWallet?.address?.toLowerCase();
+        const isSend = transfer.from.toLowerCase() === currentWallet?.address?.toLowerCase();
+        const direction = isReceive ? 'receive' : 'send';
+        return direction === selectedFilter;
+      });
     }
 
-    // Sort by timestamp (newest first)
-    return filtered.sort((a, b) => b.timestamp - a.timestamp);
-  }, [allTransactions, selectedFilter]);
+    // Sort by block number (newest first)
+    return filtered.sort((a, b) => b.blockNumber - a.blockNumber);
+  }, [allTransfers, selectedFilter, currentWallet]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -81,16 +88,22 @@ export default function TransactionsScreen() {
     }
   };
 
-  const TransactionItem = ({ tx }: { tx: TransactionInfo }) => {
-    const { date, time } = formatDateTime(tx.timestamp);
-    const icon = getTransactionIcon(tx.direction, tx.status);
-    const formattedAmount = tx.formattedValue || formatTokenAmount(tx.value, tx.tokenDecimals);
+  const TransactionItem = ({ transfer }: { transfer: any }) => {
+    const isReceive = transfer.to.toLowerCase() === currentWallet?.address?.toLowerCase();
+    const isSend = transfer.from.toLowerCase() === currentWallet?.address?.toLowerCase();
+    const direction = isReceive ? 'receive' : 'send';
+    
+    const { date, time } = formatDateTime(transfer.timestamp ? new Date(transfer.timestamp).getTime() : Date.now());
+    const icon = getTransactionIcon(direction, 'confirmed');
+    const formattedAmount = predefinedToken ? 
+      formatTokenAmount(transfer.rawValue, predefinedToken.decimals) : 
+      transfer.value.toString();
 
     return (
       <TouchableOpacity 
         className="rounded-lg border border-border bg-background p-4 mb-3"
         onPress={() => {
-          console.log('Transaction pressed:', tx.hash);
+          console.log('Transaction pressed:', transfer.hash);
           // TODO: Navigate to transaction details screen
         }}
       >
@@ -98,9 +111,7 @@ export default function TransactionsScreen() {
           {/* Left side - Icon and transaction info */}
           <View className="flex-row items-start flex-1">
             <View className={`w-12 h-12 rounded-full items-center justify-center mr-3 ${
-              tx.direction === 'receive' ? 'bg-green-100' : 
-              tx.status === 'failed' ? 'bg-red-100' : 
-              tx.status === 'pending' ? 'bg-yellow-100' : 'bg-red-100'
+              direction === 'receive' ? 'bg-green-100' : 'bg-red-100'
             }`}>
               <MaterialIcons 
                 name={icon.name as any} 
@@ -112,22 +123,22 @@ export default function TransactionsScreen() {
             <View className="flex-1 min-w-0">
               <View className="flex-row items-center gap-2 mb-1">
                 <Text className="font-semibold text-foreground">
-                  {tx.direction === 'receive' ? 'Received' : 'Sent'} {tx.tokenSymbol || 'Token'}
+                  {direction === 'receive' ? 'Received' : 'Sent'} {predefinedToken?.symbol || 'Token'}
                 </Text>
-                <View className={`px-2 py-1 rounded-full ${getStatusBadgeStyle(tx.status)}`}>
+                <View className={`px-2 py-1 rounded-full ${getStatusBadgeStyle('confirmed')}`}>
                   <Text className="text-xs font-medium capitalize">
-                    {tx.status}
+                    confirmed
                   </Text>
                 </View>
               </View>
               
               <Text className="text-sm text-muted-foreground mb-1">
-                {tx.summary || `${tx.transactionType} transaction`}
+                {direction === 'receive' ? 'Received' : 'Sent'} {predefinedToken?.symbol || 'tokens'}
               </Text>
               
               <View className="flex-row items-center gap-2 mb-1">
                 <Text className="text-xs text-muted-foreground">
-                  {tx.chainId.toUpperCase()}
+                  POLYGON
                 </Text>
                 <Text className="text-xs text-muted-foreground">•</Text>
                 <Text className="text-xs text-muted-foreground">
@@ -135,34 +146,26 @@ export default function TransactionsScreen() {
                 </Text>
               </View>
               
-              {tx.blockNumber && (
-                <Text className="text-xs text-muted-foreground">
-                  Block #{tx.blockNumber}
-                </Text>
-              )}
+              <Text className="text-xs text-muted-foreground">
+                Block #{transfer.blockNumber}
+              </Text>
             </View>
           </View>
           
           {/* Right side - Amount and value */}
           <View className="items-end ml-3">
             <Text className={`font-semibold ${
-              tx.direction === 'receive' ? 'text-green-600' : 'text-red-600'
+              direction === 'receive' ? 'text-green-600' : 'text-red-600'
             }`}>
-              {tx.direction === 'receive' ? '+' : '-'}{formattedAmount} {tx.tokenSymbol || ''}
+              {direction === 'receive' ? '+' : '-'}{formattedAmount} {predefinedToken?.symbol || ''}
             </Text>
-            
-            {tx.transactionFee && (
-              <Text className="text-xs text-muted-foreground mt-1">
-                Fee: {formatTokenAmount(tx.transactionFee)} {tx.chainId === 'eth' ? 'ETH' : tx.chainId.toUpperCase()}
-              </Text>
-            )}
           </View>
         </View>
         
         {/* Transaction hash (truncated) */}
         <View className="mt-3 pt-3 border-t border-border/50">
           <Text className="text-xs text-muted-foreground">
-            Hash: {tx.hash.slice(0, 10)}...{tx.hash.slice(-8)}
+            Hash: {transfer.hash.slice(0, 10)}...{transfer.hash.slice(-8)}
           </Text>
         </View>
       </TouchableOpacity>
@@ -221,8 +224,8 @@ export default function TransactionsScreen() {
         </View>
 
         {filteredTransactions.length > 0 ? (
-          filteredTransactions.map((tx, index) => (
-            <TransactionItem key={`${tx.hash}-${index}`} tx={tx} />
+          filteredTransactions.map((transfer, index) => (
+            <TransactionItem key={`${transfer.hash}-${index}`} transfer={transfer} />
           ))
         ) : (
           <View className="items-center justify-center py-12">
