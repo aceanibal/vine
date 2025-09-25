@@ -128,6 +128,8 @@ export interface GlobalState {
 
   // ===== DATA REFRESH ACTIONS =====
   refreshWalletData: () => Promise<void>;
+  refreshGoldPrice: () => Promise<void>;
+  startBackgroundGoldPriceService: () => void;
 }
 
 
@@ -385,6 +387,47 @@ export const useGlobalStore = create<GlobalState>()(
           }));
         }
       },
+
+      refreshGoldPrice: async () => {
+        const state = get();
+        const backendURL = state.backendURL;
+        
+        if (!backendURL) {
+          console.log('GlobalStore: No backend URL configured for gold price refresh');
+          return;
+        }
+        
+        try {
+          console.log('GlobalStore: Starting gold price refresh...');
+          
+          // Import and use the gold price service
+          const { fetchAndUpdateGoldPrice } = await import('../services/gold-price');
+          await fetchAndUpdateGoldPrice(backendURL);
+          
+          console.log('GlobalStore: Gold price refresh completed successfully');
+          
+        } catch (error) {
+          console.error('GlobalStore: Failed to refresh gold price:', error);
+          
+          // Update app state with error
+          set((state) => ({
+            appState: {
+              ...state.appState,
+              isLoading: false,
+              error: error instanceof Error ? error.message : 'Failed to refresh gold price',
+            }
+          }));
+        }
+      },
+
+      startBackgroundGoldPriceService: () => {
+        import('../services/background-gold-price').then(({ initializeBackgroundGoldPriceService }) => {
+          initializeBackgroundGoldPriceService();
+        }).catch((error) => {
+          console.error('Failed to start background gold price service:', error);
+        });
+      },
+
     }),
     {
       name: 'global-store',
@@ -430,6 +473,15 @@ export const useGlobalStore = create<GlobalState>()(
           });
           // Mark as hydrated
           state._hasHydrated = true;
+
+          // Initialize background gold price service after rehydration
+          if (state.backendURL) {
+            import('../services/background-gold-price').then(({ initializeBackgroundGoldPriceService }) => {
+              initializeBackgroundGoldPriceService();
+            }).catch((error) => {
+              console.error('Failed to initialize background gold price service:', error);
+            });
+          }
         }
       },
     }
@@ -461,4 +513,5 @@ export const useBackendURL = () => useGlobalStore((state) => state.backendURL);
 export const useTransactionData = () => useGlobalStore((state) => state.transactionData);
 export const useAllTransfers = () => useGlobalStore((state) => state.allTransfers);
 export const useTokenBalance = () => useGlobalStore((state) => state.tokenBalance);
+
 

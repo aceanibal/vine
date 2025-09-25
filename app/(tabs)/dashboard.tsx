@@ -9,7 +9,7 @@ import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { TokenIcon, getTokenIconProps } from '~/components/TokenIcon';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { useGlobalStore, useCurrentWallet } from '~/lib/stores/useGlobalStore';
+import { useGlobalStore, useCurrentWallet, usePredefinedToken } from '~/lib/stores/useGlobalStore';
 
 export default function DashboardScreen() {
   const { colors } = useColorScheme();
@@ -19,10 +19,11 @@ export default function DashboardScreen() {
 
   // Get wallet and token data from stores
   const currentWallet = useCurrentWallet();
-  const predefinedToken = useGlobalStore((state) => state.predefinedToken);
+  const predefinedToken = usePredefinedToken();
   const tokenBalance = useGlobalStore((state) => state.tokenBalance);
   const refreshWalletData = useGlobalStore((state) => state.refreshWalletData);
   const fetchTransactionData = useGlobalStore((state) => state.fetchTransactionData);
+  const refreshGoldPrice = useGlobalStore((state) => state.refreshGoldPrice);
   const isLoading = useGlobalStore((state) => state.appState.isLoading);
   const error = useGlobalStore((state) => state.appState.error);
   const lastUpdated = useGlobalStore((state) => state.appState.lastUpdated);
@@ -102,10 +103,11 @@ export default function DashboardScreen() {
       // Add haptic feedback for better user experience
       await Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       
-      // Call both refresh functions
+      // Call all refresh functions
       await Promise.all([
         refreshWalletData(),
-        fetchTransactionData()
+        fetchTransactionData(),
+        refreshGoldPrice()
       ]);
       
       // Success haptic feedback
@@ -253,6 +255,24 @@ export default function DashboardScreen() {
     } else {
       return date.toLocaleDateString();
     }
+  };
+
+  const formatTransactionDate = (timestamp: string | null, blockNumber?: number) => {
+    // If we have a valid timestamp, use it
+    if (timestamp) {
+      const date = new Date(timestamp);
+      if (!isNaN(date.getTime())) {
+        return date.toLocaleDateString();
+      }
+    }
+    
+    // If no timestamp but we have block number, show block info
+    if (blockNumber) {
+      return `Block #${blockNumber}`;
+    }
+    
+    // Final fallback
+    return 'Unknown date';
   };
 
   // Component to display the predefined token with balance
@@ -508,7 +528,7 @@ export default function DashboardScreen() {
                             {direction === 'receive' ? 'Received' : 'Sent'} {predefinedToken?.symbol || 'tokens'}
                           </Text>
                           <Text className="text-sm text-muted-foreground">
-                            {transfer.timestamp ? new Date(transfer.timestamp).toLocaleDateString() : 'Unknown date'}
+                            {formatTransactionDate(transfer.timestamp, transfer.blockNumber)}
                           </Text>
                         </View>
                       </View>

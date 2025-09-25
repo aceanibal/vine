@@ -7,8 +7,7 @@ import { useState, useEffect } from 'react';
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { useCurrentWallet } from '~/lib/stores/useGlobalStore';
-import { usePredefinedToken, useDefaultChainIdNumeric } from '~/lib/stores/useGlobalStore';
+import { useGlobalStore, useCurrentWallet, usePredefinedToken, useTokenBalance, useDefaultChainIdNumeric } from '~/lib/stores/useGlobalStore';
 // Import the JavaScript module
 const { SPONSORED_CONFIG, SponsoredOrchestrator } = require('~/lib/services/sponsored-orchestrator');
 
@@ -16,16 +15,17 @@ export default function SendScreen() {
   const { colors } = useColorScheme();
   const currentWallet = useCurrentWallet();
   const predefinedToken = usePredefinedToken();
+  const tokenBalance = useTokenBalance();
   const defaultChainIdNumeric = useDefaultChainIdNumeric();
   
   const handleBackNavigation = () => {
     router.back();
   };
   
-  const [selectedToken, setSelectedToken] = useState<any>(predefinedToken);
   const [amount, setAmount] = useState('');
   const [recipientAddress, setRecipientAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [inputMode, setInputMode] = useState<'token' | 'usd'>('token'); // 'token' or 'usd'
 
   // Component is ready when wallet is available
   useEffect(() => {
@@ -34,53 +34,151 @@ export default function SendScreen() {
     }
   }, [currentWallet]);
 
-  // Initialize from predefined token when available
-  useEffect(() => {
-    if (predefinedToken) {
-      setSelectedToken(predefinedToken);
-      console.log('Send: Using predefined token:', predefinedToken.symbol);
-    }
-  }, [predefinedToken]);
-
   const formatCurrency = (amount: number) => {
-    if (amount >= 1000000) {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        notation: 'compact',
-        maximumFractionDigits: 2,
-      }).format(amount);
-    } else if (amount >= 1000) {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        maximumFractionDigits: 0,
-      }).format(amount);
-    } else {
-      return new Intl.NumberFormat('en-US', {
-        style: 'currency',
-        currency: 'USD',
-        minimumFractionDigits: 2,
-        maximumFractionDigits: 2,
-      }).format(amount);
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD',
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    }).format(amount);
+  };
+
+  // Get token balance in readable format
+  const getTokenBalance = () => {
+    if (!predefinedToken || !tokenBalance?.balance) return '0';
+    
+    const rawBalance = tokenBalance.balance.tokenBalanceDecimal || tokenBalance.balance.tokenBalance || '0';
+    try {
+      const balanceBigInt = BigInt(rawBalance);
+      const divisor = BigInt(10 ** predefinedToken.decimals);
+      const wholePart = balanceBigInt / divisor;
+      const fractionalPart = balanceBigInt % divisor;
+      
+      const wholePartNumber = Number(wholePart);
+      const fractionalStr = fractionalPart.toString().padStart(predefinedToken.decimals, '0');
+      const trimmedFractional = fractionalStr.replace(/0+$/, '');
+      
+      if (trimmedFractional === '') {
+        return wholePart.toString();
+      }
+      
+      return `${wholePart}.${trimmedFractional}`;
+    } catch (error) {
+      return '0';
     }
   };
 
-  const calculateUSDValue = () => 0; // No price data in XRBG branch
+  // Calculate USD value of amount
+  const calculateUSDValue = (tokenAmount: number) => {
+    if (!predefinedToken?.price) return 0;
+    return tokenAmount * predefinedToken.price;
+  };
+
+  // Calculate token amount from USD
+  const calculateTokenAmount = (usdAmount: number) => {
+    if (!predefinedToken?.price || predefinedToken.price === 0) return 0;
+    return usdAmount / predefinedToken.price;
+  };
+
+  // Format token amount to match predefined token decimals
+  const formatTokenAmount = (tokenAmount: number) => {
+    if (!predefinedToken?.decimals) return tokenAmount.toFixed(6); // fallback to 6 decimals
+    return tokenAmount.toFixed(predefinedToken.decimals);
+  };
+
+  // Get the actual token amount to send (always in token units)
+  const getActualTokenAmount = () => {
+    if (!amount) return 0;
+    const amountNumber = parseFloat(amount);
+    if (isNaN(amountNumber)) return 0;
+    
+    if (inputMode === 'token') {
+      return amountNumber;
+    } else {
+      return calculateTokenAmount(amountNumber);
+    }
+  };
+
+  // Get formatted token amount string
+  const getFormattedTokenAmount = () => {
+    const tokenAmount = getActualTokenAmount();
+    return formatTokenAmount(tokenAmount);
+  };
+
+  // Get the display amount for the current input mode
+  const getDisplayAmount = () => {
+    if (!amount) return 0;
+    const amountNumber = parseFloat(amount);
+    if (isNaN(amountNumber)) return 0;
+    
+    if (inputMode === 'token') {
+      return amountNumber;
+    } else {
+      return amountNumber;
+    }
+  };
+
+  // Handle input mode toggle
+  const toggleInputMode = () => {
+    if (!amount) {
+      setInputMode(inputMode === 'token' ? 'usd' : 'token');
+      return;
+    }
+
+    const currentAmount = parseFloat(amount);
+    if (isNaN(currentAmount)) return;
+
+    if (inputMode === 'token') {
+      // Converting from token to USD
+      const usdValue = calculateUSDValue(currentAmount);
+      setAmount(usdValue.toString());
+      setInputMode('usd');
+    } else {
+      // Converting from USD to token
+      const tokenValue = calculateTokenAmount(currentAmount);
+      // Format the token value to match token decimals
+      const formattedTokenValue = formatTokenAmount(tokenValue);
+      setAmount(formattedTokenValue);
+      setInputMode('token');
+    }
+  };
+
+  // Calculate network fee (2.5% of transfer amount)
+  const calculateNetworkFee = (transferAmount: number) => {
+    return transferAmount * 0.025; // 2.5%
+  };
+
+  // Format network fee with more precision for small amounts
+  const formatNetworkFee = (feeAmount: number) => {
+    if (feeAmount < 0.01) {
+      // For very small amounts, show more decimal places
+      return `$${feeAmount.toFixed(6)}`;
+    }
+    return formatCurrency(feeAmount);
+  };
 
   const handleSend = async () => {
-    if (!amount || !recipientAddress || !selectedToken) {
+    if (!amount || !recipientAddress || !predefinedToken) {
       Alert.alert('Error', 'Please fill in all fields');
       return;
     }
 
-    if (parseFloat(amount) <= 0) {
+    const amountNumber = parseFloat(amount);
+    if (isNaN(amountNumber) || amountNumber <= 0) {
       Alert.alert('Error', 'Amount must be greater than 0');
       return;
     }
 
     if (!currentWallet?.address || !currentWallet?.privateKey) {
       Alert.alert('Error', 'No wallet available');
+      return;
+    }
+
+    // Validate balance - use actual token amount for validation
+    const actualTokenAmount = getActualTokenAmount();
+    const currentBalance = parseFloat(getTokenBalance());
+    if (actualTokenAmount > currentBalance) {
+      Alert.alert('Error', 'Insufficient balance');
       return;
     }
 
@@ -100,11 +198,11 @@ export default function SendScreen() {
       // Create sponsored orchestrator for the token's chain
       const orchestrator = new SponsoredOrchestrator(numericChainId, currentWallet.privateKey);
 
-      // Execute sponsored transfer
+      // Execute sponsored transfer - always use actual token amount
       const result = await orchestrator.executeSponsoredTransfer({
-        tokenAddress: selectedToken.address,
+        tokenAddress: predefinedToken.address,
         toAddress: recipientAddress,
-        amount: amount,
+        amount: getActualTokenAmount().toString(),
         chainId: numericChainId,
         privateKey: currentWallet.privateKey,
       });
@@ -114,7 +212,7 @@ export default function SendScreen() {
       if (result.success) {
         Alert.alert(
           'Transaction Sent',
-          `Sponsored transaction submitted successfully!\n\n${result.transactionHash ? `Hash: ${result.transactionHash.slice(0, 10)}...${result.transactionHash.slice(-8)}\n\n` : ''}Amount: ${amount} ${selectedToken.symbol}\nTo: ${recipientAddress.slice(0, 8)}...${recipientAddress.slice(-6)}\n\n✨ No gas fees! This transaction was sponsored.\n\nYou can track the transaction status in your transaction history.`,
+          `Sponsored transaction submitted successfully!\n\n${result.transactionHash ? `Hash: ${result.transactionHash.slice(0, 10)}...${result.transactionHash.slice(-8)}\n\n` : ''}Amount: ${getFormattedTokenAmount()} ${predefinedToken.symbol}\nTo: ${recipientAddress.slice(0, 8)}...${recipientAddress.slice(-6)}\n\n✨ No gas fees! This transaction was sponsored.\n\nYou can track the transaction status in your transaction history.`,
           [
             {
               text: 'OK',
@@ -149,58 +247,95 @@ export default function SendScreen() {
           <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
         </TouchableOpacity>
         <Text className="text-lg font-bold">
-          Send (Sponsored)
+          Send
         </Text>
         <View className="w-6" />
       </View>
 
       <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">
         <View className="gap-6">
-          {/* Sponsored Transaction Info */}
-          <View className="rounded-xl border border-green-200 bg-green-50 p-4">
-            <View className="flex-row items-center gap-2 mb-2">
-              <MaterialIcons name="stars" size={16} color="#16a34a" />
-              <Text className="text-sm font-semibold text-green-700">
-                Sponsored Transaction
-              </Text>
-            </View>
-            <Text className="text-xs text-green-600">
-              No gas fees! This transaction is sponsored and completely free for you.
-            </Text>
-            <Text className="text-xs text-green-500 mt-1">
-              Network: Polygon Mainnet (Chain ID: {SPONSORED_CONFIG.chainId})
-            </Text>
+          {/* Token Details */}
+          <View className="gap-4 rounded-xl border border-border bg-card p-6">
+            <Text className="text-lg font-semibold">Token Details</Text>
+            {predefinedToken ? (
+              <View className="gap-3">
+                <View className="flex-row items-center justify-between">
+                  <Text className="font-semibold">{predefinedToken.name}</Text>
+                  <Text className="text-sm text-muted-foreground">{predefinedToken.symbol}</Text>
+                </View>
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-sm text-muted-foreground">Price</Text>
+                  <Text className="font-semibold">{formatCurrency(predefinedToken.price)}</Text>
+                </View>
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-sm text-muted-foreground">Balance</Text>
+                  <Text className="font-semibold">{formatTokenAmount(parseFloat(getTokenBalance()))} {predefinedToken.symbol}</Text>
+                </View>
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-sm text-muted-foreground">Value</Text>
+                  <Text className="font-semibold">{formatCurrency(calculateUSDValue(parseFloat(getTokenBalance())))}</Text>
+                </View>
+              </View>
+            ) : (
+              <Text className="text-sm text-muted-foreground">No token configured</Text>
+            )}
           </View>
 
-          {/* Token Info (predefined) */}
-          <View className="gap-2 rounded-xl border border-border bg-card p-6">
-            <Text className="text-lg font-semibold">Token</Text>
-            <View className="flex-row items-center justify-between">
-              <Text className="font-semibold">{selectedToken?.name || 'Token'}</Text>
-              <Text className="text-xs text-muted-foreground">{selectedToken?.symbol || ''}</Text>
-            </View>
-          </View>
+  
 
           {/* Amount Input */}
           <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="text-lg font-semibold">
-              Amount
-            </Text>
+            <View className="flex-row items-center justify-between">
+              <Text className="text-lg font-semibold">
+                Amount
+              </Text>
+              <TouchableOpacity 
+                onPress={toggleInputMode}
+                className="flex-row items-center gap-2 px-3 py-2 rounded-lg bg-primary/10"
+              >
+                <Text className="text-sm font-medium text-primary">
+                  {inputMode === 'token' ? 'USD' : 'Token'}
+                </Text>
+                <MaterialIcons name="swap-horiz" size={16} color={colors.primary} />
+              </TouchableOpacity>
+            </View>
             <View className="gap-3">
               <View className="flex-row items-center gap-3">
                 <View className="flex-1">
                   <TextInput
                     value={amount}
                     onChangeText={setAmount}
-                    placeholder={selectedToken ? `0.00 ${selectedToken.symbol}` : '0.00'}
+                    placeholder={
+                      inputMode === 'token' 
+                        ? (predefinedToken ? `${formatTokenAmount(0)} ${predefinedToken.symbol}` : '0.00')
+                        : '0.00'
+                    }
                     keyboardType="decimal-pad"
                     className="text-lg font-bold"
                     style={{ color: colors.foreground }}
                   />
-                  <Text className="text-xs text-muted-foreground">
-                    ≈ {formatCurrency(calculateUSDValue())}
-                  </Text>
+                  {predefinedToken && amount && (
+                    <Text className="text-xs text-muted-foreground">
+                      {inputMode === 'token' 
+                        ? `≈ ${formatCurrency(calculateUSDValue(parseFloat(amount) || 0))}`
+                        : `≈ ${getFormattedTokenAmount()} ${predefinedToken.symbol}`
+                      }
+                    </Text>
+                  )}
                 </View>
+              </View>
+              <View className="flex-row items-center gap-2">
+                <MaterialIcons 
+                  name={inputMode === 'token' ? 'attach-money' : 'token'} 
+                  size={14} 
+                  color={colors.grey3} 
+                />
+                <Text className="text-xs text-muted-foreground">
+                  {inputMode === 'token' 
+                    ? `Enter amount in ${predefinedToken?.symbol || 'tokens'}`
+                    : 'Enter amount in USD'
+                  }
+                </Text>
               </View>
             </View>
           </View>
@@ -236,23 +371,7 @@ export default function SendScreen() {
                   Amount
                 </Text>
                 <Text className="font-semibold">
-                  {amount || '0'} {selectedToken?.symbol || ''}
-                </Text>
-              </View>
-              <View className="flex-row items-center justify-between">
-                <Text className="text-muted-foreground">
-                  Network
-                </Text>
-                <Text className="font-semibold">
-                  Polygon
-                </Text>
-              </View>
-              <View className="flex-row items-center justify-between">
-                <Text className="text-muted-foreground">
-                  Token Type
-                </Text>
-                <Text className="font-semibold">
-                  ERC-20
+                  {getFormattedTokenAmount()} {predefinedToken?.symbol || ''}
                 </Text>
               </View>
               <View className="flex-row items-center justify-between">
@@ -260,17 +379,27 @@ export default function SendScreen() {
                   Value (USD)
                 </Text>
                 <Text className="font-semibold">
-                  {formatCurrency(calculateUSDValue())}
+                  {formatCurrency(calculateUSDValue(getActualTokenAmount()))}
                 </Text>
               </View>
               <View className="flex-row items-center justify-between">
                 <Text className="text-muted-foreground">
-                  Network Fee
+                  Network Fee (2.5%)
                 </Text>
                 <View className="flex-row items-center gap-1">
-                  <MaterialIcons name="stars" size={14} color="#16a34a" />
+                  <Text className="font-semibold text-red-600">
+                    {formatNetworkFee(calculateNetworkFee(calculateUSDValue(getActualTokenAmount())))}
+                  </Text>
+                </View>
+              </View>
+              <View className="flex-row items-center justify-between">
+                <Text className="text-muted-foreground">
+                  Fee Status
+                </Text>
+                <View className="flex-row items-center gap-1">
+                  <MaterialIcons name="check-circle" size={14} color="#16a34a" />
                   <Text className="font-semibold text-green-600">
-                    FREE (Sponsored)
+                    WAIVED
                   </Text>
                 </View>
               </View>
@@ -280,7 +409,7 @@ export default function SendScreen() {
                     Total Cost
                   </Text>
                   <Text className="font-bold text-green-600">
-                    {formatCurrency(calculateUSDValue())}
+                    {formatCurrency(calculateUSDValue(getActualTokenAmount()))}
                   </Text>
                 </View>
                 <View className="flex-row items-center justify-between mt-1">
@@ -288,7 +417,7 @@ export default function SendScreen() {
                     + Network Fee
                   </Text>
                   <Text className="text-sm text-green-600">
-                    FREE
+                    {formatNetworkFee(calculateNetworkFee(calculateUSDValue(getActualTokenAmount())))} (Waived)
                   </Text>
                 </View>
               </View>
@@ -300,7 +429,7 @@ export default function SendScreen() {
             size="lg" 
             className="mt-4"
             onPress={handleSend}
-            disabled={isLoading || !amount || !recipientAddress || !selectedToken}
+            disabled={isLoading || !amount || !recipientAddress || !predefinedToken}
           >
             {isLoading ? (
               <View className="flex-row items-center gap-2">
@@ -310,13 +439,13 @@ export default function SendScreen() {
             ) : (
               <View className="flex-row items-center gap-2">
                 <MaterialIcons name="stars" size={20} color="white" />
-                <Text>Send {selectedToken?.symbol || 'Token'} (FREE)</Text>
+                <Text>Send {predefinedToken?.symbol || 'Token'} (FREE)</Text>
               </View>
             )}
           </Button>
 
           {/* Info */}
-          {!selectedToken && (
+          {!predefinedToken && (
             <View className="rounded-xl border border-yellow-200 bg-yellow-50 p-4">
               <View className="flex-row items-center gap-2 mb-2">
                 <MaterialIcons name="info" size={16} color="#d97706" />

@@ -93,7 +93,10 @@ export default function TransactionsScreen() {
     const isSend = transfer.from.toLowerCase() === currentWallet?.address?.toLowerCase();
     const direction = isReceive ? 'receive' : 'send';
     
-    const { date, time } = formatDateTime(transfer.timestamp ? new Date(transfer.timestamp).getTime() : Date.now());
+    // Use actual timestamp if available, otherwise show block number
+    const displayDate = transfer.timestamp ? 
+      formatDateTime(new Date(transfer.timestamp).getTime()) : 
+      { date: `Block #${transfer.blockNumber}`, time: '' };
     const icon = getTransactionIcon(direction, 'confirmed');
     const formattedAmount = predefinedToken ? 
       formatTokenAmount(transfer.rawValue, predefinedToken.decimals) : 
@@ -142,7 +145,7 @@ export default function TransactionsScreen() {
                 </Text>
                 <Text className="text-xs text-muted-foreground">•</Text>
                 <Text className="text-xs text-muted-foreground">
-                  {date} at {time}
+                  {displayDate.date}{displayDate.time ? ` at ${displayDate.time}` : ''}
                 </Text>
               </View>
               
