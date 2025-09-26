@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useMemo } from 'react';
+import { saveWalletSecrets, removeWalletSecrets } from '../services/wallet-secure-store';
 
 
 export interface Wallet {
@@ -177,12 +178,27 @@ export const useGlobalStore = create<GlobalState>()(
       // ===== WALLET ACTIONS =====
       addWallet: (wallet: Wallet) => {
         console.log('GlobalStore: Adding wallet:', wallet.address);
-        set((state) => ({
-          wallets: [...state.wallets, wallet],
-          currentWallet: wallet,
-          isWalletCreated: true,
-        }));
-        console.log('GlobalStore: Wallet added successfully');
+        console.log('GlobalStore: Saving secrets to SecureStore...', { address: wallet.address, hasPk: !!wallet.privateKey, pkLen: wallet.privateKey ? String(wallet.privateKey).length : 0, hasMnemonic: !!wallet.mnemonic });
+        (async () => {
+          try {
+            await saveWalletSecrets({ address: wallet.address, privateKey: wallet.privateKey || '', mnemonic: wallet.mnemonic });
+            console.log('GlobalStore: SecureStore save complete');
+          } catch (e) {
+            console.error('GlobalStore: Failed saving wallet secrets to SecureStore', e);
+          } finally {
+            const walletMeta: Wallet = {
+              address: wallet.address,
+              isImported: wallet.isImported,
+              createdAt: wallet.createdAt,
+            } as Wallet;
+            set((state) => ({
+              wallets: [...state.wallets, walletMeta],
+              currentWallet: walletMeta,
+              isWalletCreated: true,
+            }));
+            console.log('GlobalStore: Wallet added successfully');
+          }
+        })();
       },
 
       setCurrentWallet: (wallet: Wallet | null) => {
@@ -194,6 +210,9 @@ export const useGlobalStore = create<GlobalState>()(
           wallets: state.wallets.filter((w) => w.address !== address),
           currentWallet: state.currentWallet?.address === address ? null : state.currentWallet,
         }));
+        removeWalletSecrets(address).catch((e) => {
+          console.error('GlobalStore: Failed removing wallet secrets from SecureStore', e);
+        });
       },
 
       setWalletCreated: (created: boolean) => {

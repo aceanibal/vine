@@ -5,7 +5,6 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useMemo } from 'react';
 
 import { Text } from '~/components/nativewindui/Text';
-import { TokenIcon, getTokenIconProps } from '~/components/TokenIcon';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useAllTransfers, useCurrentWallet, usePredefinedToken } from '~/lib/stores/useGlobalStore';
 

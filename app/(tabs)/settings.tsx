@@ -8,6 +8,7 @@ import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore } from '~/lib/stores/useGlobalStore';
+import { removeWalletSecrets, loadWalletSecrets } from '~/lib/services/wallet-secure-store';
 
 import { CustomModal } from '~/components/CustomModal';
 import { Toast } from '~/components/Toast';
@@ -17,6 +18,7 @@ import * as LocalAuthentication from 'expo-local-authentication';
 export default function SettingsScreen() {
   const { colors } = useColorScheme();
   const currentWallet = useGlobalStore((state) => state.currentWallet);
+  const wallets = useGlobalStore((state) => state.wallets);
   const clearWallets = useGlobalStore((state) => state.clearWallets);
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -73,7 +75,10 @@ export default function SettingsScreen() {
       type: 'warning',
       onConfirm: async () => {
         try {
-          // Delete wallet data
+          // Remove secrets for all stored wallets
+          const addresses = wallets.map(w => w.address).filter(Boolean);
+          await Promise.all(addresses.map(addr => removeWalletSecrets(addr)));
+          // Delete wallet data from store
           clearWallets();    
           setWalletAddress(null);
           console.log('Wallet deleted');
@@ -101,7 +106,7 @@ export default function SettingsScreen() {
     console.log('View recovery phrase button pressed');
     try {
       console.log('Wallet data loaded:', !!currentWallet);
-      if (!currentWallet) {
+      if (!currentWallet || !currentWallet.address) {
         setToastConfig({
           message: 'No wallet data found.',
           type: 'error'
@@ -121,7 +126,16 @@ export default function SettingsScreen() {
         // For simulator testing - bypass biometric check
         if (__DEV__) {
           console.log('Development mode - bypassing biometric for simulator');
-          setRecoveryMnemonic(currentWallet.mnemonic || '');
+          const { mnemonic } = await loadWalletSecrets(currentWallet.address);
+          if (!mnemonic) {
+            setToastConfig({
+              message: 'Recovery phrase not available.',
+              type: 'error'
+            });
+            setShowToast(true);
+            return;
+          }
+          setRecoveryMnemonic(mnemonic);
           setShowRecoveryModal(true);
           return;
         }
@@ -146,7 +160,16 @@ export default function SettingsScreen() {
       if (result.success) {
         console.log('Authentication successful, showing recovery modal');
         // Show recovery phrase in bottom modal
-        setRecoveryMnemonic(currentWallet.mnemonic || '');
+        const { mnemonic } = await loadWalletSecrets(currentWallet.address);
+        if (!mnemonic) {
+          setToastConfig({
+            message: 'Recovery phrase not available.',
+            type: 'error'
+          });
+          setShowToast(true);
+          return;
+        }
+        setRecoveryMnemonic(mnemonic);
         setShowRecoveryModal(true);
       } else {
         console.log('Authentication failed');

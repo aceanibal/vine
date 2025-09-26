@@ -1,13 +1,16 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { View, ScrollView, TouchableOpacity } from 'react-native';
+import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
+import { useCurrentWallet } from '~/lib/stores/useGlobalStore';
+import { requirePrivateKey } from '~/lib/services/wallet-secure-store';
 
 export default function TransferScreen() {
   const { colors } = useColorScheme();
+  const currentWallet = useCurrentWallet();
 
   return (
     <SafeAreaView className="flex-1 bg-white">
@@ -29,8 +32,18 @@ export default function TransferScreen() {
             <View className="gap-3">
               <TouchableOpacity 
                 className="flex-row items-center justify-between rounded-lg border border-border bg-background p-4"
-                onPress={() => {
+                onPress={async () => {
                   console.log('Send button pressed!');
+                  try {
+                    if (!currentWallet?.address) {
+                      Alert.alert('No wallet', 'Please create or import a wallet first.');
+                      return;
+                    }
+                    const pk = await requirePrivateKey(currentWallet.address);
+                  } catch (e: any) {
+                    console.error('Failed to load private key:', e);
+                    Alert.alert('SecureStore Error', e?.message || String(e));
+                  }
                   router.push({
                     pathname: '/(tabs)/send',
                     params: { source: 'transfer' }

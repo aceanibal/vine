@@ -3,13 +3,14 @@ import { router } from 'expo-router';
 import { View, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore, useCurrentWallet, usePredefinedToken, useTokenBalance, useDefaultChainIdNumeric } from '~/lib/stores/useGlobalStore';
-// Import the JavaScript module
-const { SPONSORED_CONFIG, SponsoredOrchestrator } = require('~/lib/services/sponsored-orchestrator');
+import { SPONSORED_CONFIG, SponsoredOrchestrator } from '~/lib/services/sponsored-orchestrator';
+import { requirePrivateKey } from '~/lib/services/wallet-secure-store';
 
 export default function SendScreen() {
   const { colors } = useColorScheme();
@@ -26,6 +27,7 @@ export default function SendScreen() {
   const [recipientAddress, setRecipientAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [inputMode, setInputMode] = useState<'token' | 'usd'>('token'); // 'token' or 'usd'
+  const [isAuthVerified, setIsAuthVerified] = useState(false);
 
   // Component is ready when wallet is available
   useEffect(() => {
@@ -33,6 +35,54 @@ export default function SendScreen() {
       console.log('Send: Wallet available, component ready');
     }
   }, [currentWallet]);
+
+  // Biometric authentication on screen load
+  useEffect(() => {
+    let cancelled = false;
+    const runAuth = async () => {
+      try {
+        const hasHardware = await LocalAuthentication.hasHardwareAsync();
+        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
+
+        if (!hasHardware || !isEnrolled) {
+          if (__DEV__) {
+            console.log('Development mode - bypassing biometric for simulator');
+            if (!cancelled) setIsAuthVerified(true);
+            return;
+          }
+          Alert.alert(
+            'Authentication Required',
+            'Biometric authentication is required to access the send screen.',
+            [{ text: 'OK', onPress: () => router.back() }]
+          );
+          return;
+        }
+
+        const result = await LocalAuthentication.authenticateAsync({
+          promptMessage: 'Authenticate to continue',
+          fallbackLabel: 'Use passcode',
+          cancelLabel: 'Cancel',
+        });
+        if (result.success) {
+          if (!cancelled) setIsAuthVerified(true);
+        } else {
+          Alert.alert('Authentication Failed', 'Unable to authenticate.', [
+            { text: 'OK', onPress: () => router.back() },
+          ]);
+        }
+      } catch (e) {
+        console.error('Biometric auth error on load:', e);
+        Alert.alert('Authentication Error', 'Failed to perform biometric authentication.', [
+          { text: 'OK', onPress: () => router.back() },
+        ]);
+      }
+    };
+
+    runAuth();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -169,7 +219,7 @@ export default function SendScreen() {
       return;
     }
 
-    if (!currentWallet?.address || !currentWallet?.privateKey) {
+    if (!currentWallet?.address) {
       Alert.alert('Error', 'No wallet available');
       return;
     }
@@ -192,19 +242,25 @@ export default function SendScreen() {
       return;
     }
 
+    // Ensure auth was completed
+    if (!isAuthVerified) {
+      Alert.alert('Authentication Required', 'Please authenticate to proceed.');
+      return;
+    }
+
     setIsLoading(true);
     
     try {
+      // Load private key securely from SecureStore
+      const privateKey = await requirePrivateKey(currentWallet.address);
       // Create sponsored orchestrator for the token's chain
-      const orchestrator = new SponsoredOrchestrator(numericChainId, currentWallet.privateKey);
+      const orchestrator = new SponsoredOrchestrator(numericChainId, privateKey);
 
       // Execute sponsored transfer - always use actual token amount
       const result = await orchestrator.executeSponsoredTransfer({
         tokenAddress: predefinedToken.address,
         toAddress: recipientAddress,
         amount: getActualTokenAmount().toString(),
-        chainId: numericChainId,
-        privateKey: currentWallet.privateKey,
       });
 
       setIsLoading(false);
@@ -212,7 +268,7 @@ export default function SendScreen() {
       if (result.success) {
         Alert.alert(
           'Transaction Sent',
-          `Sponsored transaction submitted successfully!\n\n${result.transactionHash ? `Hash: ${result.transactionHash.slice(0, 10)}...${result.transactionHash.slice(-8)}\n\n` : ''}Amount: ${getFormattedTokenAmount()} ${predefinedToken.symbol}\nTo: ${recipientAddress.slice(0, 8)}...${recipientAddress.slice(-6)}\n\n✨ No gas fees! This transaction was sponsored.\n\nYou can track the transaction status in your transaction history.`,
+          `Sponsored transaction submitted successfully!\n\n${result.transferTxHash ? `Hash: ${result.transferTxHash.slice(0, 10)}...${result.transferTxHash.slice(-8)}\n\n` : ''}Amount: ${getFormattedTokenAmount()} ${predefinedToken.symbol}\nTo: ${recipientAddress.slice(0, 8)}...${recipientAddress.slice(-6)}\n\n✨ No gas fees! This transaction was sponsored.\n\nYou can track the transaction status in your transaction history.`,
           [
             {
               text: 'OK',
@@ -223,7 +279,7 @@ export default function SendScreen() {
       } else {
         Alert.alert(
           'Transaction Failed',
-          result.error || 'An unknown error occurred',
+          'An unknown error occurred',
           [{ text: 'OK' }]
         );
       }
@@ -241,6 +297,11 @@ export default function SendScreen() {
   // No token selector in XRBG branch
 
   return (
+    !isAuthVerified ? (
+      <SafeAreaView className="flex-1 bg-white items-center justify-center">
+        <Text>Authenticating...</Text>
+      </SafeAreaView>
+    ) : (
     <SafeAreaView className="flex-1 bg-white">
       <View className="flex-row items-center justify-between p-4 border-b border-border bg-white">
         <TouchableOpacity onPress={handleBackNavigation}>
@@ -429,7 +490,7 @@ export default function SendScreen() {
             size="lg" 
             className="mt-4"
             onPress={handleSend}
-            disabled={isLoading || !amount || !recipientAddress || !predefinedToken}
+            disabled={isLoading || !amount || !recipientAddress || !predefinedToken || !isAuthVerified}
           >
             {isLoading ? (
               <View className="flex-row items-center gap-2">
@@ -461,5 +522,6 @@ export default function SendScreen() {
         </View>
       </ScrollView>
     </SafeAreaView>
+    )
   );
 }

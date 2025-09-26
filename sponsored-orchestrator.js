@@ -1,4 +1,5 @@
-const { ethers } = require('ethers');
+// Converted to TypeScript version in sponsored-orchestrator.ts. This JS file is kept only as a thin export for compatibility if imported elsewhere.
+module.exports = require('./sponsored-orchestrator.ts');
 
 // Default configuration for supported chains
 const DEFAULT_CONFIG = {

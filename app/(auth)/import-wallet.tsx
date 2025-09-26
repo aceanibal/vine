@@ -7,7 +7,7 @@ import "@ethersproject/shims";
 import { MaterialIcons } from '@expo/vector-icons';
 import { ethers } from 'ethers';
 import { router } from 'expo-router';
-import { Platform, View, ScrollView, TextInput } from 'react-native';
+import { Platform, View, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 
@@ -16,6 +16,7 @@ import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore } from '~/lib/stores/useGlobalStore';
 import { CustomModal } from '~/components/CustomModal';
+import { MnemonicInputGrid } from '~/components/MnemonicInputGrid';
 
 const ROOT_STYLE = { flex: 1 };
 
@@ -35,6 +36,7 @@ export default function ImportWalletScreen() {
   // Get wallet store actions
   const addWallet = useGlobalStore((state) => state.addWallet);
 
+  const [words, setWords] = useState<string[]>(Array(12).fill(''));
 
   const validateMnemonic = (phrase: string) => {
     try {
@@ -46,12 +48,8 @@ export default function ImportWalletScreen() {
     }
   };
 
-  const handleMnemonicChange = (text: string) => {
-    setMnemonic(text);
-    const isValid = validateMnemonic(text);
-    // Ensure we pass a boolean value to setIsValidMnemonic
-    setIsValidMnemonic(Boolean(isValid));
-  };
+  // Unused now; kept for reference if we re-add textarea input in future
+  const handleMnemonicChange = (_text: string) => {};
 
   const handleImportWallet = async () => {
     if (!isValidMnemonic) {
@@ -123,7 +121,7 @@ export default function ImportWalletScreen() {
     router.replace('/');
   };
 
-  const wordCount = mnemonic.trim().split(/\s+/).filter(word => word.length > 0).length;
+  const wordCount = words.filter((w) => w.length > 0).length;
 
   return (
     <SafeAreaView style={ROOT_STYLE}>
@@ -159,51 +157,15 @@ export default function ImportWalletScreen() {
               </Text>
             </View>
 
-            {/* Mnemonic Input */}
-            <View className="gap-4">
-              <Text className="text-center">
-                Recovery Phrase
-              </Text>
-              
-              <View className="gap-3">
-                <TextInput
-                  className="min-h-[120] rounded-xl border border-border bg-card p-4 text-body"
-                  placeholder="Enter your 12-word recovery phrase..."
-                  placeholderTextColor={colors.grey2}
-                  value={mnemonic}
-                  onChangeText={handleMnemonicChange}
-                  multiline
-                  textAlignVertical="top"
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  secureTextEntry={false}
-                />
-                
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-xs text-muted-foreground">
-                    {wordCount}/12 words
-                  </Text>
-                  {mnemonic.length > 0 && (
-                    <View className="flex-row items-center gap-1">
-                      <MaterialIcons 
-                        name={isValidMnemonic ? "check-circle" : "error"} 
-                        size={16} 
-                        color={isValidMnemonic ? colors.primary : colors.destructive} 
-                      />
-                      <Text 
-                        className={isValidMnemonic ? "text-xs text-primary" : "text-xs text-destructive"}
-                      >
-                        {isValidMnemonic ? "Valid phrase" : "Invalid phrase"}
-                      </Text>
-                    </View>
-                  )}
-                </View>
-              </View>
-
-              <Text className="text-xs text-center text-muted-foreground">
-                Enter each word separated by spaces. The phrase is case-insensitive.
-              </Text>
-            </View>
+            {/* Mnemonic Input: reusable component */}
+            <MnemonicInputGrid
+              words={words}
+              onChangeWords={(w) => setWords(w)}
+              onValidityChange={(valid, phrase) => {
+                setMnemonic(phrase);
+                setIsValidMnemonic(valid);
+              }}
+            />
 
             {/* Security Warning */}
             <View className="gap-3 rounded-xl bg-orange-50 p-4 dark:bg-orange-950/20">
