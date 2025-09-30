@@ -304,7 +304,7 @@ export class SponsoredOrchestrator {
 
   private buildTokenTransferCalls(): [string, number, string][] {
     const erc20Iface = new Interface(['function transfer(address to, uint256 amount) external returns (bool)']);
-    const decimals = 6; // TODO: fetch dynamically
+    const decimals = 18; // TODO: fetch dynamically
     const data = erc20Iface.encodeFunctionData('transfer', [this.config.toAddress, ethers.parseUnits(this.config.amount, decimals)]);
     return [[this.config.tokenAddress, 0, data]];
   }
