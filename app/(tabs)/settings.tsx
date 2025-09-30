@@ -8,20 +8,30 @@ import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore } from '~/lib/stores/useGlobalStore';
+import { SponsoredOrchestrator, DELEGATION_ADDRESS } from '~/lib/services/sponsored-orchestrator';
+import { requirePrivateKey } from '~/lib/services/wallet-secure-store';
 import { removeWalletSecrets, loadWalletSecrets } from '~/lib/services/wallet-secure-store';
 
 import { CustomModal } from '~/components/CustomModal';
 import { Toast } from '~/components/Toast';
 import { RecoveryPhraseModal } from '~/components/RecoveryPhraseModal';
 import * as LocalAuthentication from 'expo-local-authentication';
+ 
 
 export default function SettingsScreen() {
   const { colors } = useColorScheme();
   const currentWallet = useGlobalStore((state) => state.currentWallet);
   const wallets = useGlobalStore((state) => state.wallets);
   const clearWallets = useGlobalStore((state) => state.clearWallets);
+  const authorizationStatus = useGlobalStore((state) => state.authorizationStatus);
+  const isWalletAuthorized = useGlobalStore((state) => state.isWalletAuthorized);
+  const checkWalletAuthorization = useGlobalStore((state) => state.checkWalletAuthorization);
+  const authorizeWallet = useGlobalStore((state) => state.authorizeWallet);
+  const isStoreLoading = useGlobalStore((state) => state.appState.isLoading);  
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
+  const [isRevoking, setIsRevoking] = useState(false);
+  const [isAuthorizing, setIsAuthorizing] = useState(false);
 
   const [showModal, setShowModal] = useState(false);
   const [modalConfig, setModalConfig] = useState({
@@ -189,6 +199,8 @@ export default function SettingsScreen() {
     }
   };
 
+  
+
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center">
@@ -204,7 +216,20 @@ export default function SettingsScreen() {
         <Text className="text-lg font-bold">
           Settings
         </Text>
-        <View className="w-6" />
+        <TouchableOpacity 
+          onPress={() => checkWalletAuthorization()}
+          disabled={isStoreLoading}
+          className="flex-row items-center gap-1"
+        >
+          <MaterialIcons 
+            name="refresh" 
+            size={16} 
+            color={isStoreLoading ? colors.grey : colors.primary} 
+          />
+          <Text className="text-xs text-primary font-medium">
+            {isStoreLoading ? 'Loading...' : 'Refresh'}
+          </Text>
+        </TouchableOpacity>
       </View>
       <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">
         <View className="gap-6">
@@ -296,6 +321,112 @@ export default function SettingsScreen() {
                 <MaterialIcons name="lock" size={20} color={colors.primary} />
                 <Text>Secure storage enabled</Text>
               </View>
+            </View>
+          </View>
+
+          {/* Authorization Section */}
+          <View className="gap-4 rounded-xl border border-border bg-card p-6">
+            <View className="flex-row items-center justify-between">
+              <Text className="font-semibold">Authorization</Text>
+              <TouchableOpacity 
+                onPress={() => checkWalletAuthorization()}
+                disabled={isStoreLoading}
+                className="flex-row items-center gap-1"
+              >
+                <MaterialIcons 
+                  name="refresh" 
+                  size={16} 
+                  color={isStoreLoading ? colors.grey : colors.primary} 
+                />
+                <Text className="text-xs text-primary font-medium">
+                  {isStoreLoading ? 'Loading...' : 'Refresh'}
+                </Text>
+              </TouchableOpacity>
+            </View>
+            <View className="gap-3">
+              <View className="flex-row items-center justify-between">
+                <Text>Status</Text>
+                <Text className={isStoreLoading ? 'text-muted-foreground' : (isWalletAuthorized ? 'text-green-600' : 'text-red-600')}>
+                  {isStoreLoading ? '(loading)' : (isWalletAuthorized ? 'Authorized' : 'Not Authorized')}
+                </Text>
+              </View>
+              <View>
+                <Text className="text-xs text-muted-foreground">
+                  Delegated To: {authorizationStatus?.delegatedTo || '—'}
+                </Text>
+                <Text className="text-xs text-muted-foreground">
+                  Matches Target: {authorizationStatus?.matchesTarget ? 'Yes' : 'No'}
+                </Text>
+                <Text className="text-xs text-muted-foreground">
+                  Delegation Contract: {DELEGATION_ADDRESS}
+                </Text>
+              </View>
+              {/* Authorize (only when not authorized) */}
+              {!isWalletAuthorized && (
+                <Button
+                  className="flex-row items-center justify-start gap-3"
+                  onPress={async () => {
+                    if (!currentWallet?.address) return;
+                    setIsAuthorizing(true);
+                    try {
+                      const ok = await authorizeWallet();
+                      setToastConfig({
+                        message: ok ? 'Authorization successful' : 'Authorization failed',
+                        type: ok ? 'success' : 'error',
+                      });
+                      setShowToast(true);
+                    } catch (e: any) {
+                      setToastConfig({ message: e?.message || 'Authorization failed', type: 'error' });
+                      setShowToast(true);
+                    } finally {
+                      setIsAuthorizing(false);
+                    }
+                  }}
+                  disabled={isAuthorizing || isStoreLoading}
+                >
+                  <MaterialIcons name="check-circle" size={20} color="white" />
+                  <Text>{isAuthorizing ? 'Authorizing...' : 'Authorize Wallet'}</Text>
+                </Button>
+              )}
+              {/* Revoke Authorization moved below details (only when authorized) */}
+              {isWalletAuthorized && (
+                <Button
+                  variant="secondary"
+                  className="flex-row items-center justify-start gap-3"
+                  onPress={async () => {
+                    if (!currentWallet?.address) return;
+                    setIsRevoking(true);
+                    try {
+                      console.log('[Settings] Revoke pressed');
+                      const numericChainId = SponsoredOrchestrator.isChainSupported(137) ? 137 : 137; // fallback to 137
+                      const privateKey = await requirePrivateKey(currentWallet.address);
+                      const orchestrator = new SponsoredOrchestrator(numericChainId, privateKey);
+                      console.log('[Settings] Calling revokeAuthorizationWithTracking');
+                      const res = await orchestrator.revokeAuthorizationWithTracking();
+                      console.log('[Settings] Revoke result:', res);
+                      await checkWalletAuthorization();
+                      setToastConfig({
+                        message: res.success ? `Authorization revoked${res.revokeTxHash ? ` (tx: ${res.revokeTxHash.slice(0,10)}...${res.revokeTxHash.slice(-8)})` : ''}` : 'Failed to revoke authorization',
+                        type: res.success ? 'success' : 'error',
+                      });
+                      setShowToast(true);
+                    } catch (e: any) {
+                      console.log('[Settings] Revoke error:', e);
+                      setToastConfig({ message: e?.message || 'Revocation failed', type: 'error' });
+                      setShowToast(true);
+                    } finally {
+                      setIsRevoking(false);
+                    }
+                  }}
+                  disabled={isRevoking}
+                >
+                  <MaterialIcons name="block" size={20} color={colors.primary} />
+                  <Text className="text-primary">{isRevoking ? 'Revoking...' : 'Revoke Authorization'}</Text>
+                </Button>
+              )}
+              
+
+              
             </View>
           </View>
 

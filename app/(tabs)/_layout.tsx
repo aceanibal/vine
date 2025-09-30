@@ -45,6 +45,12 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="authorize"
+        options={{
+          href: null, // hidden route used for authorization flow
+        }}
+      />
+      <Tabs.Screen
         name="receive"
         options={{
           href: null, // This hides the tab from the bottom navigation

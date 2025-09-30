@@ -2,7 +2,8 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { View, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
+import { useFocusEffect } from '@react-navigation/native';
 import * as LocalAuthentication from 'expo-local-authentication';
 
 import { Button } from '~/components/nativewindui/Button';
@@ -28,6 +29,7 @@ export default function SendScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [inputMode, setInputMode] = useState<'token' | 'usd'>('token'); // 'token' or 'usd'
   const [isAuthVerified, setIsAuthVerified] = useState(false);
+  const checkWalletAuthorization = useGlobalStore((s) => s.checkWalletAuthorization);
 
   // Component is ready when wallet is available
   useEffect(() => {
@@ -35,6 +37,26 @@ export default function SendScreen() {
       console.log('Send: Wallet available, component ready');
     }
   }, [currentWallet]);
+
+  
+
+  // Ensure redirect when navigating into this screen (e.g., from Transfer)
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      (async () => {
+        try {
+          await checkWalletAuthorization();
+          if (active && currentWallet?.address && !useGlobalStore.getState().isWalletAuthorized) {
+            router.replace('/(tabs)/authorize');
+          }
+        } catch (_e) {}
+      })();
+      return () => {
+        active = false;
+      };
+    }, [currentWallet?.address])
+  );
 
   // Biometric authentication on screen load
   useEffect(() => {
@@ -248,6 +270,8 @@ export default function SendScreen() {
       return;
     }
 
+    
+
     setIsLoading(true);
     
     try {
@@ -255,8 +279,8 @@ export default function SendScreen() {
       const privateKey = await requirePrivateKey(currentWallet.address);
       // Create sponsored orchestrator for the token's chain
       const orchestrator = new SponsoredOrchestrator(numericChainId, privateKey);
-
-      // Execute sponsored transfer - always use actual token amount
+      router.replace('/(tabs)/dashboard' as any);
+      // Send sponsored transfer - always use actual token amount
       const result = await orchestrator.executeSponsoredTransfer({
         tokenAddress: predefinedToken.address,
         toAddress: recipientAddress,
@@ -266,16 +290,9 @@ export default function SendScreen() {
       setIsLoading(false);
 
       if (result.success) {
-        Alert.alert(
-          'Transaction Sent',
-          `Sponsored transaction submitted successfully!\n\n${result.transferTxHash ? `Hash: ${result.transferTxHash.slice(0, 10)}...${result.transferTxHash.slice(-8)}\n\n` : ''}Amount: ${getFormattedTokenAmount()} ${predefinedToken.symbol}\nTo: ${recipientAddress.slice(0, 8)}...${recipientAddress.slice(-6)}\n\n✨ No gas fees! This transaction was sponsored.\n\nYou can track the transaction status in your transaction history.`,
-          [
-            {
-              text: 'OK',
-              onPress: () => handleBackNavigation()
-            }
-          ]
-        );
+        // Redirect to dashboard; monitoring happens elsewhere
+        router.replace('/(tabs)/dashboard' as any);
+        return;
       } else {
         Alert.alert(
           'Transaction Failed',
@@ -293,6 +310,7 @@ export default function SendScreen() {
       );
     }
   };
+
 
   // No token selector in XRBG branch
 
@@ -504,6 +522,7 @@ export default function SendScreen() {
               </View>
             )}
           </Button>
+
 
           {/* Info */}
           {!predefinedToken && (

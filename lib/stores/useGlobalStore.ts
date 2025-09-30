@@ -1,8 +1,9 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { useMemo } from 'react';
 import { saveWalletSecrets, removeWalletSecrets } from '../services/wallet-secure-store';
+import { requirePrivateKey } from '../services/wallet-secure-store';
+import { SponsoredOrchestrator } from '../services/sponsored-orchestrator';
 
 
 export interface Wallet {
@@ -82,6 +83,13 @@ export interface TransactionData {
 
 // ===== GLOBAL STORE STATE =====
 
+type AuthorizationStatus = {
+  isDelegated: boolean;
+  delegatedTo: string | null;
+  matchesTarget?: boolean;
+  verifiedDelegationContract?: boolean;
+};
+
 export interface GlobalState {
   // ===== WALLET STATE =====
   wallets: Wallet[];
@@ -89,6 +97,28 @@ export interface GlobalState {
   isWalletCreated: boolean;
   isUnlocked: boolean;
   _hasHydrated: boolean;
+
+  // ===== AUTHORIZATION STATE =====
+  authorizationStatus: AuthorizationStatus | null;
+  isWalletAuthorized: boolean;
+
+  // ===== ACTIVE TRANSACTION STATE =====
+  activeTransaction: {
+    hash: string | null;
+    operation: 'Delegation' | 'Token Transfer' | null;
+    status: 'idle' | 'pending' | 'success' | 'failed';
+    startedAt: string | null;
+    completedAt: string | null;
+    step?: string | null;
+    progress?: number | null;
+    logs?: { at: string; message: string; data?: any }[];
+    context?: {
+      chainId?: number;
+      tokenAddress?: string;
+      toAddress?: string;
+      amount?: string;
+    } | null;
+  };
 
   // ===== APP CONFIG (SINGLE TOKEN) =====
   defaultChainIdNumeric: number; // e.g., 137 for Polygon mainnet
@@ -131,6 +161,18 @@ export interface GlobalState {
   refreshWalletData: () => Promise<void>;
   refreshGoldPrice: () => Promise<void>;
   startBackgroundGoldPriceService: () => void;
+
+  // ===== AUTHORIZATION ACTIONS =====
+  checkWalletAuthorization: () => Promise<void>;
+  authorizeWallet: () => Promise<boolean>;
+
+  // ===== ACTIVE TRANSACTION ACTIONS =====
+  setActiveTransaction: (tx: Partial<GlobalState['activeTransaction']>) => void;
+  updateActiveTransactionStatus: (status: GlobalState['activeTransaction']['status'], hash?: string | null) => void;
+  addActiveTransactionLog: (message: string, data?: any) => void;
+  setActiveTransactionStep: (step: string, progress?: number | null) => void;
+  setActiveTransactionContext: (ctx: Partial<GlobalState['activeTransaction']['context']>) => void;
+  clearActiveTransaction: () => void;
 }
 
 
@@ -146,6 +188,23 @@ export const useGlobalStore = create<GlobalState>()(
       isWalletCreated: false,
       isUnlocked: false,
       _hasHydrated: false,
+
+      // Authorization state
+      authorizationStatus: null,
+      isWalletAuthorized: false,
+
+      // Active transaction default
+      activeTransaction: {
+        hash: null,
+        operation: null,
+        status: 'idle',
+        startedAt: null,
+        completedAt: null,
+        step: null,
+        progress: null,
+        logs: [],
+        context: null,
+      },
 
       // App config (single token)
       defaultChainIdNumeric: 137, // Default to Polygon mainnet
@@ -447,6 +506,160 @@ export const useGlobalStore = create<GlobalState>()(
         });
       },
 
+      // ===== AUTHORIZATION ACTIONS =====
+      checkWalletAuthorization: async () => {
+        const state = get();
+        const currentWallet = state.currentWallet;
+        const chainId = state.defaultChainIdNumeric;
+        if (!currentWallet?.address) {
+          return;
+        }
+        try {
+          set((s) => ({
+            appState: { ...s.appState, isLoading: true, error: null },
+          }));
+
+          const privateKey = await requirePrivateKey(currentWallet.address);
+          const orchestrator = new SponsoredOrchestrator(chainId, privateKey);
+          const statusRaw = await orchestrator.checkDelegationStatus();
+          const status: AuthorizationStatus = { ...statusRaw };
+          const isAuthorized = !!(status.isDelegated && status.matchesTarget);
+
+          set((s) => ({
+            authorizationStatus: status,
+            isWalletAuthorized: isAuthorized,
+            appState: { ...s.appState, isLoading: false, lastUpdated: new Date() },
+          }));
+        } catch (error) {
+          set((s) => ({
+            appState: {
+              ...s.appState,
+              isLoading: false,
+              error: error instanceof Error ? error.message : 'Authorization check failed',
+            },
+          }));
+        }
+      },
+
+      authorizeWallet: async () => {
+        const state = get();
+        const currentWallet = state.currentWallet;
+        const chainId = state.defaultChainIdNumeric;
+        if (!currentWallet?.address) {
+          console.log('GlobalStore.authorizeWallet: no current wallet');
+          return false;
+        }
+        if (!SponsoredOrchestrator.isChainSupported(chainId)) {
+          set((s) => ({
+            appState: { ...s.appState, error: `Chain ${chainId} not supported`, isLoading: false },
+          }));
+          console.log('GlobalStore.authorizeWallet: unsupported chain', { chainId });
+          return false;
+        }
+        try {
+          set((s) => ({
+            appState: { ...s.appState, isLoading: true, error: null },
+          }));
+          console.log('GlobalStore.authorizeWallet: start', { chainId, address: currentWallet.address });
+          const privateKey = await requirePrivateKey(currentWallet.address);
+          console.log('GlobalStore.authorizeWallet: privateKey loaded (len)', privateKey ? String(privateKey).length : 0);
+          const orchestrator = new SponsoredOrchestrator(chainId, privateKey);
+          const ok = await orchestrator.verifyDelegationContract();
+          console.log('GlobalStore.authorizeWallet: verifyDelegationContract ->', ok);
+          if (!ok) {
+            set((s) => ({
+              appState: { ...s.appState, isLoading: false, error: 'Delegation contract verification failed' },
+            }));
+            return false;
+          }
+          const res = await orchestrator.approveAuthorizationWithTracking();
+          console.log('GlobalStore.authorizeWallet: delegation result', { success: res.success, txHash: res.delegationTxHash });
+          // After submitting, refresh authorization snapshot
+          await get().checkWalletAuthorization();
+          const authorized = get().isWalletAuthorized;
+          set((s) => ({ appState: { ...s.appState, isLoading: false } }));
+          console.log('GlobalStore.authorizeWallet: final authorized ->', authorized);
+          return authorized;
+        } catch (error) {
+          console.log('GlobalStore.authorizeWallet: error', error);
+          set((s) => ({
+            appState: {
+              ...s.appState,
+              isLoading: false,
+              error: error instanceof Error ? error.message : 'Authorization failed',
+            },
+          }));
+          return false;
+        }
+      },
+
+      // ===== ACTIVE TRANSACTION ACTIONS =====
+      setActiveTransaction: (tx) => {
+        set((s) => ({
+          activeTransaction: {
+            hash: tx.hash ?? s.activeTransaction.hash,
+            operation: (tx.operation as any) ?? s.activeTransaction.operation,
+            status: (tx.status as any) ?? s.activeTransaction.status,
+            startedAt: tx.startedAt ?? s.activeTransaction.startedAt,
+            completedAt: tx.completedAt ?? s.activeTransaction.completedAt,
+            step: (tx as any).step ?? s.activeTransaction.step,
+            progress: (tx as any).progress ?? s.activeTransaction.progress,
+            logs: (tx as any).logs ?? s.activeTransaction.logs,
+            context: (tx as any).context ?? s.activeTransaction.context,
+          },
+        }));
+      },
+      updateActiveTransactionStatus: (status, hash) => {
+        set((s) => ({
+          activeTransaction: {
+            ...s.activeTransaction,
+            status,
+            hash: typeof hash !== 'undefined' ? hash : s.activeTransaction.hash,
+            completedAt: status === 'success' || status === 'failed' ? new Date().toISOString() : s.activeTransaction.completedAt,
+          },
+        }));
+      },
+      addActiveTransactionLog: (message: string, data?: any) => {
+        set((s) => ({
+          activeTransaction: {
+            ...s.activeTransaction,
+            logs: [...(s.activeTransaction.logs || []), { at: new Date().toISOString(), message, data }],
+          },
+        }));
+      },
+      setActiveTransactionStep: (step: string, progress?: number | null) => {
+        set((s) => ({
+          activeTransaction: {
+            ...s.activeTransaction,
+            step,
+            progress: typeof progress === 'number' ? progress : s.activeTransaction.progress ?? null,
+          },
+        }));
+      },
+      setActiveTransactionContext: (ctx: Partial<GlobalState['activeTransaction']['context']>) => {
+        set((s) => ({
+          activeTransaction: {
+            ...s.activeTransaction,
+            context: { ...(s.activeTransaction.context || {}), ...ctx },
+          },
+        }));
+      },
+      clearActiveTransaction: () => {
+        set({
+          activeTransaction: {
+            hash: null,
+            operation: null,
+            status: 'idle',
+            startedAt: null,
+            completedAt: null,
+            step: null,
+            progress: null,
+            logs: [],
+            context: null,
+          },
+        });
+      },
+
     }),
     {
       name: 'global-store',
@@ -464,6 +677,11 @@ export const useGlobalStore = create<GlobalState>()(
         transactionData: state.transactionData,
         allTransfers: state.allTransfers,
         tokenBalance: state.tokenBalance,
+        // Persist authorization snapshot
+        authorizationStatus: state.authorizationStatus,
+        isWalletAuthorized: state.isWalletAuthorized,
+        // Persist active transaction to survive reloads
+        activeTransaction: state.activeTransaction,
       }),
       onRehydrateStorage: () => (state) => {
         console.log('GlobalStore: Rehydration completed');

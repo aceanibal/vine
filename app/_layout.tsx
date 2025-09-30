@@ -12,6 +12,8 @@ import { StatusBar } from 'expo-status-bar';
 
 import { useColorScheme, useInitialAndroidBarSync } from '~/lib/useColorScheme';
 import { NAV_THEME } from '~/theme';
+import { useEffect, useRef } from 'react';
+import { useGlobalStore } from '~/lib/stores/useGlobalStore';
 
 export {
   // Catch any errors thrown by the Layout component.
@@ -21,6 +23,18 @@ export {
 export default function RootLayout() {
   useInitialAndroidBarSync();
   const { colorScheme, isDarkColorScheme } = useColorScheme();
+  const _hasHydrated = useGlobalStore((s) => s._hasHydrated);
+  const currentWallet = useGlobalStore((s) => s.currentWallet);
+  const checkWalletAuthorization = useGlobalStore((s) => s.checkWalletAuthorization);
+  const hasCheckedRef = useRef(false);
+
+  useEffect(() => {
+    if (!_hasHydrated) return;
+    if (!currentWallet?.address) return;
+    if (hasCheckedRef.current) return;
+    hasCheckedRef.current = true;
+    checkWalletAuthorization().catch(() => {});
+  }, [_hasHydrated, currentWallet?.address]);
 
   return (
     <>
