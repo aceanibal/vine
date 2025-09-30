@@ -1,11 +1,14 @@
 import React from 'react';
-import { View, Image, ViewStyle } from 'react-native';
+import { View, Image, ViewStyle, ImageSourcePropType } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
 import { useGlobalStore } from '~/lib/stores/useGlobalStore';
+import XRBG_LOGO from '~/assets/xrb-gold-logo-icon.png';
 
 interface TokenIconProps {
   // For new token system (from Moralis)
   logoURI?: string;
+  // Local bundled asset source
+  source?: ImageSourcePropType;
   
   // For legacy token system (MaterialIcons)
   icon?: string;
@@ -19,6 +22,7 @@ interface TokenIconProps {
 
 export const TokenIcon: React.FC<TokenIconProps> = ({
   logoURI,
+  source,
   icon,
   color = '#666',
   size = 24,
@@ -37,7 +41,24 @@ export const TokenIcon: React.FC<TokenIconProps> = ({
     ...style,
   };
 
-  // Priority 1: Use remote logo from Moralis if available
+  // Priority 1: Use local bundled asset if provided
+  if (source) {
+    return (
+      <View style={containerStyle}>
+        <Image
+          source={source}
+          style={{
+            width: size,
+            height: size,
+            borderRadius: size / 2,
+          }}
+          resizeMode="contain"
+        />
+      </View>
+    );
+  }
+
+  // Priority 2: Use remote logo if available
   if (logoURI) {
     return (
       <View style={containerStyle}>
@@ -59,7 +80,7 @@ export const TokenIcon: React.FC<TokenIconProps> = ({
     );
   }
 
-  // Priority 2: Use MaterialIcon if provided
+  // Priority 3: Use MaterialIcon if provided
   if (icon) {
     return (
       <View style={containerStyle}>
@@ -72,7 +93,7 @@ export const TokenIcon: React.FC<TokenIconProps> = ({
     );
   }
 
-  // Priority 3: Default fallback icon
+  // Priority 4: Default fallback icon
   return (
     <View style={containerStyle}>
       <MaterialIcons 
@@ -86,6 +107,13 @@ export const TokenIcon: React.FC<TokenIconProps> = ({
 
 // Helper function to get token icon props from different token formats
 export const getTokenIconProps = (token: any) => {
+  // If a local logo identifier is provided, map it to a bundled asset
+  if (token.logo === 'xrbg') {
+    return {
+      source: XRBG_LOGO,
+    };
+  }
+
   // New token format (from Zustand store)
   if (token.logoURI !== undefined || token.isNative !== undefined) {
     return {

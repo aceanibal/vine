@@ -324,7 +324,8 @@ export default function DashboardScreen() {
             {...getTokenIconProps({
               symbol: predefinedToken.symbol,
               name: predefinedToken.name,
-              address: predefinedToken.address
+              address: predefinedToken.address,
+              logo: (predefinedToken as any).logo
             })}
             size={30}
           />
@@ -370,7 +371,7 @@ export default function DashboardScreen() {
           No Wallet Found
         </Text>
         <Text className="mt-2 text-center text-base text-muted-foreground">
-          Create a new wallet to get started with Vine
+          Create a new wallet to get started with XRBG Gold Wallet
         </Text>
         <Button 
           size="lg" 
@@ -389,7 +390,7 @@ export default function DashboardScreen() {
       <View className="flex-row items-center justify-between px-2 py-4 border-b border-border bg-white">
         <View className="w-6" />
         <Text className="text-lg font-bold">
-          Vine Wallet
+          XRB Gold Wallet
         </Text>
         <View className="w-6" />
       </View>

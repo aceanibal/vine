@@ -81,7 +81,7 @@ export default function WelcomeConsentScreen() {
             </Text>
             <Text
               className="ios:text-left ios:font-black text-primary text-center">
-              Vine Wallet
+              XRB Gold Wallet
             </Text>
           </View>
 

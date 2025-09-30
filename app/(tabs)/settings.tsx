@@ -245,7 +245,7 @@ export default function SettingsScreen() {
                 {/* Wallet Info */}
                 <View className="gap-2">
                   <Text className="font-bold">
-                    Vine Wallet
+                    XRBG Gold Wallet
                   </Text>
                   <Text className="text-xs text-muted-foreground break-all">
                     {walletAddress}

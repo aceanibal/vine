@@ -22,6 +22,8 @@ export interface PredefinedTokenConfig {
   name: string;
   decimals: number;
   price: number; // Token price in USD
+  // Optional local logo identifier for rendering bundled assets
+  logo?: 'xrbg';
 }
 
 
@@ -209,11 +211,12 @@ export const useGlobalStore = create<GlobalState>()(
       // App config (single token)
       defaultChainIdNumeric: 137, // Default to Polygon mainnet
       predefinedToken: {
-        address: '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
-        symbol: 'USDC',
-        name: 'USD Coin',
-        decimals: 6,
+        address: '0x756715CF771C82aFB371B9C9f9Dd64E690766351',
+        symbol: 'XRBG',
+        name: 'XRB Gold',
+        decimals: 18,
         price: 121,
+        logo: 'xrbg',
       },
       backendURL: 'https://cpprhb1jz6.execute-api.us-east-1.amazonaws.com',
 
@@ -664,6 +667,30 @@ export const useGlobalStore = create<GlobalState>()(
     {
       name: 'global-store',
       storage: createJSONStorage(() => AsyncStorage),
+      version: 1,
+      migrate: (persisted: any, version: number) => {
+        // Ensure predefined token migrates to XRBG and includes logo
+        try {
+          const next = { ...(persisted || {}) };
+          const pt = next.predefinedToken || null;
+          const shouldMigrate = !pt || pt.symbol !== 'XRBG' || pt.address !== '0x756715CF771C82aFB371B9C9f9Dd64E690766351';
+          if (shouldMigrate) {
+            next.predefinedToken = {
+              address: '0x756715CF771C82aFB371B9C9f9Dd64E690766351',
+              symbol: 'XRBG',
+              name: 'XRB Gold',
+              decimals: 18,
+              price: (pt && typeof pt.price === 'number') ? pt.price : 121,
+              logo: 'xrbg',
+            };
+          } else if (!pt.logo) {
+            next.predefinedToken = { ...pt, logo: 'xrbg' };
+          }
+          return next;
+        } catch (_e) {
+          return persisted;
+        }
+      },
       partialize: (state) => ({
         // Persist wallet data
         wallets: state.wallets,
@@ -690,15 +717,34 @@ export const useGlobalStore = create<GlobalState>()(
           if (!state.predefinedToken) {
             console.log('GlobalStore: Setting predefined token after rehydration');
             state.predefinedToken = {
-              address: '0x3c499c542cef5e3811e1192ce70d8cc03d5c3359',
-              symbol: 'USDC',
-              name: 'USD Coin',
-              decimals: 6,
+              address: '0x756715CF771C82aFB371B9C9f9Dd64E690766351',
+              symbol: 'XRBG',
+              name: 'XRB Gold',
+              decimals: 18,
               price: 121,
+              logo: 'xrbg',
             };
           } else if (typeof state.predefinedToken.price !== 'number') {
             console.log('GlobalStore: Setting predefined token price after rehydration');
             state.predefinedToken.price = 121;
+          }
+
+          // If store was previously USDC or missing logo, force XRBG migration in-memory too
+          if (
+            state.predefinedToken.symbol !== 'XRBG' ||
+            state.predefinedToken.address !== '0x756715CF771C82aFB371B9C9f9Dd64E690766351'
+          ) {
+            console.log('GlobalStore: Migrating predefined token to XRBG on rehydration');
+            state.predefinedToken = {
+              address: '0x756715CF771C82aFB371B9C9f9Dd64E690766351',
+              symbol: 'XRBG',
+              name: 'XRB Gold',
+              decimals: 18,
+              price: typeof state.predefinedToken.price === 'number' ? state.predefinedToken.price : 121,
+              logo: 'xrbg',
+            };
+          } else if (!state.predefinedToken.logo) {
+            state.predefinedToken.logo = 'xrbg';
           }
           
           console.log('GlobalStore: Rehydrated state:', {
