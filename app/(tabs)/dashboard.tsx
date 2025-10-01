@@ -2,7 +2,7 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { View, ScrollView, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect, useMemo, useRef } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
 
 import { Button } from '~/components/nativewindui/Button';
@@ -27,8 +27,7 @@ export default function DashboardScreen() {
   const isLoading = useGlobalStore((state) => state.appState.isLoading);
   const error = useGlobalStore((state) => state.appState.error);
   const lastUpdated = useGlobalStore((state) => state.appState.lastUpdated);
-  const activeTransaction = useGlobalStore((state) => state.activeTransaction);
-  const clearActiveTransaction = useGlobalStore((state) => state.clearActiveTransaction);
+  
   
   
   // Get recent transactions for display from global store
@@ -86,17 +85,7 @@ export default function DashboardScreen() {
     }
   }, [currentWallet, fetchTransactionData]);
 
-  // When a transaction succeeds, hide the active transaction card and refresh activity
-  const prevTxStatusRef = useRef<string | null>(null);
-  useEffect(() => {
-    const currentStatus = activeTransaction?.status;
-    if (prevTxStatusRef.current !== 'success' && currentStatus === 'success') {
-      // First hide the card, then refresh the recent activity
-      clearActiveTransaction();
-      fetchTransactionData().catch((e) => console.error('Failed to refresh activity after success:', e));
-    }
-    prevTxStatusRef.current = currentStatus || null;
-  }, [activeTransaction?.status, clearActiveTransaction, fetchTransactionData]);
+  // Active transaction UI and success handling moved to its own screen
 
   // Check if wallet exists
   const hasWallet = !!walletAddress;
@@ -486,85 +475,7 @@ export default function DashboardScreen() {
           </View>
 
 
-          {/* Active Transaction */}
-          {activeTransaction && activeTransaction.status !== 'idle' && (
-            <View className="gap-3 rounded-xl border border-border bg-card p-6">
-              <View className="flex-row items-center justify-between">
-                <Text className="text-lg font-semibold">Active Transaction</Text>
-                <View className={`px-2 py-1 rounded-full ${activeTransaction.status === 'pending' ? 'bg-blue-100' : activeTransaction.status === 'success' ? 'bg-green-100' : 'bg-red-100'}`}>
-                  <Text className={`text-xs font-medium ${activeTransaction.status === 'pending' ? 'text-blue-600' : activeTransaction.status === 'success' ? 'text-green-600' : 'text-red-600'}`}>
-                    {activeTransaction.status?.toUpperCase()}
-                  </Text>
-                </View>
-              </View>
-              <View className="gap-2">
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-sm text-muted-foreground">Operation</Text>
-                  <Text className="font-semibold">{activeTransaction.operation || '—'}</Text>
-                </View>
-                {!!activeTransaction.hash && (
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-sm text-muted-foreground">Hash</Text>
-                    <Text className="text-xs text-primary break-all">{activeTransaction.hash}</Text>
-                  </View>
-                )}
-                {!!activeTransaction.step && (
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-sm text-muted-foreground">Step</Text>
-                    <Text className="font-medium">{activeTransaction.step}</Text>
-                  </View>
-                )}
-                <View>
-                  <View className="h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <View 
-                      className={`h-2 ${activeTransaction.status === 'failed' ? 'bg-red-500' : 'bg-primary'}`}
-                      style={{ width: `${Math.min(Math.max(activeTransaction.progress ?? (activeTransaction.status === 'success' ? 100 : 10), 0), 100)}%` }}
-                    />
-                  </View>
-                  <View className="flex-row items-center justify-between mt-1">
-                    <Text className="text-xs text-muted-foreground">Progress</Text>
-                    <Text className="text-xs font-medium">{Math.round(activeTransaction.progress ?? (activeTransaction.status === 'success' ? 100 : 10))}%</Text>
-                  </View>
-                </View>
-              </View>
-              {(activeTransaction.context && (activeTransaction.context.tokenAddress || activeTransaction.context.toAddress || activeTransaction.context.amount)) && (
-                <View className="gap-2 pt-2 border-t border-border">
-                  <Text className="text-sm font-semibold">Details</Text>
-                  {!!activeTransaction.context.tokenAddress && (
-                    <View className="flex-row items-center justify-between">
-                      <Text className="text-sm text-muted-foreground">Token</Text>
-                      <Text className="text-xs break-all">{activeTransaction.context.tokenAddress}</Text>
-                    </View>
-                  )}
-                  {!!activeTransaction.context.toAddress && (
-                    <View className="flex-row items-center justify-between">
-                      <Text className="text-sm text-muted-foreground">To</Text>
-                      <Text className="text-xs break-all">{activeTransaction.context.toAddress}</Text>
-                    </View>
-                  )}
-                  {!!activeTransaction.context.amount && (
-                    <View className="flex-row items-center justify-between">
-                      <Text className="text-sm text-muted-foreground">Amount</Text>
-                      <Text className="text-sm font-medium">{activeTransaction.context.amount}</Text>
-                    </View>
-                  )}
-                </View>
-              )}
-              {(activeTransaction.logs && activeTransaction.logs.length > 0) && (
-                <View className="gap-2 pt-2 border-t border-border">
-                  <Text className="text-sm font-semibold">Activity</Text>
-                  <View className="gap-1">
-                    {activeTransaction.logs.slice(-4).map((log, idx) => (
-                      <View key={`${log.at}-${idx}`} className="flex-row items-start justify-between">
-                        <Text className="text-[10px] text-muted-foreground mr-2">{new Date(log.at).toLocaleTimeString()}</Text>
-                        <Text className="text-xs flex-1 text-right">{log.message}</Text>
-                      </View>
-                    ))}
-                  </View>
-                </View>
-              )}
-            </View>
-          )}
+          {/* Active transaction display moved to its own screen */}
           
           {/* Recent Activity */}
           <View className="gap-4 rounded-xl border border-border bg-card p-6">

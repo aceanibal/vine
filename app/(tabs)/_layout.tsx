@@ -63,6 +63,13 @@ export default function TabLayout() {
         }}
       />
 
+      <Tabs.Screen
+        name="active-transaction"
+        options={{
+          href: null, // hidden route for active transaction screen
+        }}
+      />
+
     </Tabs>
   );
 } 

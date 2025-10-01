@@ -10,8 +10,7 @@ import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore, useCurrentWallet, usePredefinedToken, useTokenBalance, useDefaultChainIdNumeric } from '~/lib/stores/useGlobalStore';
-import { SPONSORED_CONFIG, SponsoredOrchestrator } from '~/lib/services/sponsored-orchestrator';
-import { requirePrivateKey } from '~/lib/services/wallet-secure-store';
+import { checkDelegationStatus, executeSponsoredTransfer } from '~/lib/services/sponsored-orchestrator';
 
 export default function SendScreen() {
   const { colors } = useColorScheme();
@@ -29,7 +28,7 @@ export default function SendScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [inputMode, setInputMode] = useState<'token' | 'usd'>('token'); // 'token' or 'usd'
   const [isAuthVerified, setIsAuthVerified] = useState(false);
-  const checkWalletAuthorization = useGlobalStore((s) => s.checkWalletAuthorization);
+  const setAuthorizationSnapshot = useGlobalStore((s) => s.setAuthorizationSnapshot);
 
   // Component is ready when wallet is available
   useEffect(() => {
@@ -46,9 +45,12 @@ export default function SendScreen() {
       let active = true;
       (async () => {
         try {
-          await checkWalletAuthorization();
-          if (active && currentWallet?.address && !useGlobalStore.getState().isWalletAuthorized) {
-            router.replace('/(tabs)/authorize');
+          if (currentWallet?.address) {
+            const status = await checkDelegationStatus(currentWallet.address);
+            setAuthorizationSnapshot(status as any);
+            if (active && !useGlobalStore.getState().isWalletAuthorized) {
+              router.replace('/(tabs)/authorize');
+            }
           }
         } catch (_e) {}
       })();
@@ -254,15 +256,7 @@ export default function SendScreen() {
       return;
     }
 
-    // Use default chain id from store
-    const numericChainId = defaultChainIdNumeric || 137;
-    if (!SponsoredOrchestrator.isChainSupported(numericChainId)) {
-      Alert.alert(
-        'Chain Not Supported', 
-        `Sponsored transactions are currently only supported on Polygon mainnet (Chain ID: ${SPONSORED_CONFIG.chainId}). Please try a different token or chain.`
-      );
-      return;
-    }
+    // Single-chain app; no chain support check needed
 
     // Ensure auth was completed
     if (!isAuthVerified) {
@@ -275,31 +269,15 @@ export default function SendScreen() {
     setIsLoading(true);
     
     try {
-      // Load private key securely from SecureStore
-      const privateKey = await requirePrivateKey(currentWallet.address);
-      // Create sponsored orchestrator for the token's chain
-      const orchestrator = new SponsoredOrchestrator(numericChainId, privateKey);
-      router.replace('/(tabs)/dashboard' as any);
-      // Send sponsored transfer - always use actual token amount
-      const result = await orchestrator.executeSponsoredTransfer({
+      router.replace('/(tabs)/active-transaction' as any);
+      await executeSponsoredTransfer({
+        fromAddress: currentWallet.address,
         tokenAddress: predefinedToken.address,
         toAddress: recipientAddress,
         amount: getActualTokenAmount().toString(),
       });
 
       setIsLoading(false);
-
-      if (result.success) {
-        // Redirect to dashboard; monitoring happens elsewhere
-        router.replace('/(tabs)/dashboard' as any);
-        return;
-      } else {
-        Alert.alert(
-          'Transaction Failed',
-          'An unknown error occurred',
-          [{ text: 'OK' }]
-        );
-      }
     } catch (error: any) {
       setIsLoading(false);
       console.error('Sponsored transaction error:', error);

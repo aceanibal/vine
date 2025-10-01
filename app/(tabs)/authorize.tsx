@@ -7,27 +7,23 @@ import { useState } from 'react';
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { useGlobalStore, useCurrentWallet, useDefaultChainIdNumeric, usePredefinedToken } from '~/lib/stores/useGlobalStore';
-import { SponsoredOrchestrator } from '~/lib/services/sponsored-orchestrator';
-import { requirePrivateKey } from '~/lib/services/wallet-secure-store';
+import { useGlobalStore, useCurrentWallet } from '~/lib/stores/useGlobalStore';
+import { approveAuthorizationWithTracking, checkDelegationStatus } from '~/lib/services/sponsored-orchestrator';
 
 export default function AuthorizeScreen() {
   const { colors } = useColorScheme();
   const currentWallet = useCurrentWallet();
-  const chainId = useDefaultChainIdNumeric();
   const [isLoading, setIsLoading] = useState(false);
-  const checkWalletAuthorization = useGlobalStore((s) => s.checkWalletAuthorization);
+  const setAuthorizationSnapshot = useGlobalStore((s) => s.setAuthorizationSnapshot);
 
   const handleAuthorize = async () => {
     if (!currentWallet?.address) return;
     setIsLoading(true);
     try {
-      const numericChainId = chainId || SponsoredOrchestrator.isChainSupported(137) ? 137 : 137; // fallback to 137
-      const privateKey = await requirePrivateKey(currentWallet.address);
-      const orchestrator = new SponsoredOrchestrator(numericChainId, privateKey);
-      const res = await orchestrator.approveAuthorizationWithTracking();
+      const res = await approveAuthorizationWithTracking(currentWallet.address);
       if (res.success) {
-        await checkWalletAuthorization();
+        const status = await checkDelegationStatus(currentWallet.address);
+        setAuthorizationSnapshot(status as any);
         if (useGlobalStore.getState().isWalletAuthorized) {
           router.replace('/(tabs)/send');
           return;

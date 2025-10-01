@@ -2,8 +2,6 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { saveWalletSecrets, removeWalletSecrets } from '../services/wallet-secure-store';
-import { requirePrivateKey } from '../services/wallet-secure-store';
-import { SponsoredOrchestrator } from '../services/sponsored-orchestrator';
 
 
 export interface Wallet {
@@ -127,6 +125,16 @@ export interface GlobalState {
   predefinedToken: PredefinedTokenConfig | null;
   backendURL: string;
 
+  // ===== ORCHESTRATOR CONFIG =====
+  orchestratorConfig: {
+    delegationAddress: string;
+    providerUrl: string;
+    relayerEndpoint: string;
+    maxRetries: number;
+    retryDelayMs: number;
+    supportedChains: number[];
+  };
+
   // ===== TRANSACTION DATA =====
   transactionData: TransactionData | null;
   allTransfers: Transfer[]; // Combined and sorted transfers
@@ -167,6 +175,7 @@ export interface GlobalState {
   // ===== AUTHORIZATION ACTIONS =====
   checkWalletAuthorization: () => Promise<void>;
   authorizeWallet: () => Promise<boolean>;
+  setAuthorizationSnapshot: (status: AuthorizationStatus) => void;
 
   // ===== ACTIVE TRANSACTION ACTIONS =====
   setActiveTransaction: (tx: Partial<GlobalState['activeTransaction']>) => void;
@@ -219,6 +228,16 @@ export const useGlobalStore = create<GlobalState>()(
         logo: 'xrbg',
       },
       backendURL: 'https://cpprhb1jz6.execute-api.us-east-1.amazonaws.com',
+
+      // Orchestrator config (single source of truth)
+      orchestratorConfig: {
+        delegationAddress: '0x9a686f5eae58b62b435eaa034d48e57dc94bc36c',
+        providerUrl: 'https://polygon-rpc.com',
+        relayerEndpoint: 'https://cpprhb1jz6.execute-api.us-east-1.amazonaws.com/relay',
+        maxRetries: 30,
+        retryDelayMs: 2000,
+        supportedChains: [137],
+      },
 
       // Transaction data
       transactionData: null,
@@ -513,7 +532,6 @@ export const useGlobalStore = create<GlobalState>()(
       checkWalletAuthorization: async () => {
         const state = get();
         const currentWallet = state.currentWallet;
-        const chainId = state.defaultChainIdNumeric;
         if (!currentWallet?.address) {
           return;
         }
@@ -521,18 +539,8 @@ export const useGlobalStore = create<GlobalState>()(
           set((s) => ({
             appState: { ...s.appState, isLoading: true, error: null },
           }));
-
-          const privateKey = await requirePrivateKey(currentWallet.address);
-          const orchestrator = new SponsoredOrchestrator(chainId, privateKey);
-          const statusRaw = await orchestrator.checkDelegationStatus();
-          const status: AuthorizationStatus = { ...statusRaw };
-          const isAuthorized = !!(status.isDelegated && status.matchesTarget);
-
-          set((s) => ({
-            authorizationStatus: status,
-            isWalletAuthorized: isAuthorized,
-            appState: { ...s.appState, isLoading: false, lastUpdated: new Date() },
-          }));
+          // No-op: UI will compute and call setAuthorizationSnapshot
+          set((s) => ({ appState: { ...s.appState, isLoading: false } }));
         } catch (error) {
           set((s) => ({
             appState: {
@@ -547,42 +555,18 @@ export const useGlobalStore = create<GlobalState>()(
       authorizeWallet: async () => {
         const state = get();
         const currentWallet = state.currentWallet;
-        const chainId = state.defaultChainIdNumeric;
         if (!currentWallet?.address) {
           console.log('GlobalStore.authorizeWallet: no current wallet');
-          return false;
-        }
-        if (!SponsoredOrchestrator.isChainSupported(chainId)) {
-          set((s) => ({
-            appState: { ...s.appState, error: `Chain ${chainId} not supported`, isLoading: false },
-          }));
-          console.log('GlobalStore.authorizeWallet: unsupported chain', { chainId });
           return false;
         }
         try {
           set((s) => ({
             appState: { ...s.appState, isLoading: true, error: null },
           }));
-          console.log('GlobalStore.authorizeWallet: start', { chainId, address: currentWallet.address });
-          const privateKey = await requirePrivateKey(currentWallet.address);
-          console.log('GlobalStore.authorizeWallet: privateKey loaded (len)', privateKey ? String(privateKey).length : 0);
-          const orchestrator = new SponsoredOrchestrator(chainId, privateKey);
-          const ok = await orchestrator.verifyDelegationContract();
-          console.log('GlobalStore.authorizeWallet: verifyDelegationContract ->', ok);
-          if (!ok) {
-            set((s) => ({
-              appState: { ...s.appState, isLoading: false, error: 'Delegation contract verification failed' },
-            }));
-            return false;
-          }
-          const res = await orchestrator.approveAuthorizationWithTracking();
-          console.log('GlobalStore.authorizeWallet: delegation result', { success: res.success, txHash: res.delegationTxHash });
-          // After submitting, refresh authorization snapshot
-          await get().checkWalletAuthorization();
-          const authorized = get().isWalletAuthorized;
+          console.log('GlobalStore.authorizeWallet: start', { address: currentWallet.address });
+          // No-op: UI/service will perform authorization
           set((s) => ({ appState: { ...s.appState, isLoading: false } }));
-          console.log('GlobalStore.authorizeWallet: final authorized ->', authorized);
-          return authorized;
+          return false;
         } catch (error) {
           console.log('GlobalStore.authorizeWallet: error', error);
           set((s) => ({
@@ -594,6 +578,15 @@ export const useGlobalStore = create<GlobalState>()(
           }));
           return false;
         }
+      },
+
+      setAuthorizationSnapshot: (status: AuthorizationStatus) => {
+        const isAuthorized = !!(status.isDelegated && status.matchesTarget);
+        set((s) => ({
+          authorizationStatus: status,
+          isWalletAuthorized: isAuthorized,
+          appState: { ...s.appState, lastUpdated: new Date() },
+        }));
       },
 
       // ===== ACTIVE TRANSACTION ACTIONS =====

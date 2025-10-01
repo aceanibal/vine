@@ -13,15 +13,7 @@ const { height: screenHeight } = Dimensions.get('window');
 
 export function RecoveryPhraseModal({ visible, onClose, mnemonic }: RecoveryPhraseModalProps) {
   const { colors } = useColorScheme();
-
-  console.log('RecoveryPhraseModal render:', { visible, mnemonic: mnemonic ? 'has mnemonic' : 'no mnemonic' });
-
   const words = mnemonic.split(' ');
-
-  if (!visible) {
-    console.log('RecoveryPhraseModal not visible, returning null');
-    return null;
-  }
 
   return (
     <Modal

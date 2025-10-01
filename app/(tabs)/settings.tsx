@@ -8,8 +8,7 @@ import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore } from '~/lib/stores/useGlobalStore';
-import { SponsoredOrchestrator, DELEGATION_ADDRESS } from '~/lib/services/sponsored-orchestrator';
-import { requirePrivateKey } from '~/lib/services/wallet-secure-store';
+import { approveAuthorizationWithTracking, revokeAuthorizationWithTracking, checkDelegationStatus } from '~/lib/services/sponsored-orchestrator';
 import { removeWalletSecrets, loadWalletSecrets } from '~/lib/services/wallet-secure-store';
 
 import { CustomModal } from '~/components/CustomModal';
@@ -27,6 +26,8 @@ export default function SettingsScreen() {
   const isWalletAuthorized = useGlobalStore((state) => state.isWalletAuthorized);
   const checkWalletAuthorization = useGlobalStore((state) => state.checkWalletAuthorization);
   const authorizeWallet = useGlobalStore((state) => state.authorizeWallet);
+  const setAuthorizationSnapshot = useGlobalStore((state) => state.setAuthorizationSnapshot);
+  const orchestratorConfig = useGlobalStore((state) => state.orchestratorConfig);
   const isStoreLoading = useGlobalStore((state) => state.appState.isLoading);  
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -47,7 +48,6 @@ export default function SettingsScreen() {
   });
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [recoveryMnemonic, setRecoveryMnemonic] = useState<string>('');
-  const [isLoadingChains, setIsLoadingChains] = useState(false);
 
   useEffect(() => {
     loadData();
@@ -63,11 +63,6 @@ export default function SettingsScreen() {
     }
   };
 
-  const refreshActiveChains = async () => {
-    // XRBG branch: Active chains feature removed
-    setToastConfig({ message: 'Active chains not available in this version', type: 'info' });
-    setShowToast(true);
-  };
 
 
   const handleCreateWallet = () => {
@@ -211,25 +206,12 @@ export default function SettingsScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-row items-center justify-between p-4 border-b border-border bg-white">
+      <View className="flex-row items-center justify-between px-2 py-4 border-b border-border bg-white">
         <View className="w-6" />
         <Text className="text-lg font-bold">
           Settings
         </Text>
-        <TouchableOpacity 
-          onPress={() => checkWalletAuthorization()}
-          disabled={isStoreLoading}
-          className="flex-row items-center gap-1"
-        >
-          <MaterialIcons 
-            name="refresh" 
-            size={16} 
-            color={isStoreLoading ? colors.grey : colors.primary} 
-          />
-          <Text className="text-xs text-primary font-medium">
-            {isStoreLoading ? 'Loading...' : 'Refresh'}
-          </Text>
-        </TouchableOpacity>
+        <View className="w-6" />
       </View>
       <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">
         <View className="gap-6">
@@ -303,27 +285,6 @@ export default function SettingsScreen() {
             )}
           </View>
 
-          {/* Security Section */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="font-semibold">
-              Wallet Security
-            </Text>
-            <View className="gap-3">
-              <View className="flex-row items-center gap-3">
-                <MaterialIcons name="security" size={20} color={colors.primary} />
-                <Text>Private keys encrypted</Text>
-              </View>
-              <View className="flex-row items-center gap-3">
-                <MaterialIcons name="backup" size={20} color={colors.primary} />
-                <Text>Recovery phrase available</Text>
-              </View>
-              <View className="flex-row items-center gap-3">
-                <MaterialIcons name="lock" size={20} color={colors.primary} />
-                <Text>Secure storage enabled</Text>
-              </View>
-            </View>
-          </View>
-
           {/* Authorization Section */}
           <View className="gap-4 rounded-xl border border-border bg-card p-6">
             <View className="flex-row items-center justify-between">
@@ -358,7 +319,7 @@ export default function SettingsScreen() {
                   Matches Target: {authorizationStatus?.matchesTarget ? 'Yes' : 'No'}
                 </Text>
                 <Text className="text-xs text-muted-foreground">
-                  Delegation Contract: {DELEGATION_ADDRESS}
+                  Delegation Contract: {orchestratorConfig.delegationAddress}
                 </Text>
               </View>
               {/* Authorize (only when not authorized) */}
@@ -369,7 +330,17 @@ export default function SettingsScreen() {
                     if (!currentWallet?.address) return;
                     setIsAuthorizing(true);
                     try {
-                      const ok = await authorizeWallet();
+                      const ok = await (async () => {
+                        if (!currentWallet?.address) return false;
+                        try {
+                          const res = await approveAuthorizationWithTracking(currentWallet.address);
+                          const status = await checkDelegationStatus(currentWallet.address);
+                          setAuthorizationSnapshot(status as any);
+                          return !!res.success;
+                        } catch (_e) {
+                          return false;
+                        }
+                      })();
                       setToastConfig({
                         message: ok ? 'Authorization successful' : 'Authorization failed',
                         type: ok ? 'success' : 'error',
@@ -398,13 +369,10 @@ export default function SettingsScreen() {
                     setIsRevoking(true);
                     try {
                       console.log('[Settings] Revoke pressed');
-                      const numericChainId = SponsoredOrchestrator.isChainSupported(137) ? 137 : 137; // fallback to 137
-                      const privateKey = await requirePrivateKey(currentWallet.address);
-                      const orchestrator = new SponsoredOrchestrator(numericChainId, privateKey);
-                      console.log('[Settings] Calling revokeAuthorizationWithTracking');
-                      const res = await orchestrator.revokeAuthorizationWithTracking();
+                      const res = await revokeAuthorizationWithTracking(currentWallet.address);
                       console.log('[Settings] Revoke result:', res);
-                      await checkWalletAuthorization();
+                      const status = await checkDelegationStatus(currentWallet.address);
+                      setAuthorizationSnapshot(status as any);
                       setToastConfig({
                         message: res.success ? `Authorization revoked${res.revokeTxHash ? ` (tx: ${res.revokeTxHash.slice(0,10)}...${res.revokeTxHash.slice(-8)})` : ''}` : 'Failed to revoke authorization',
                         type: res.success ? 'success' : 'error',
