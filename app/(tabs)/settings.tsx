@@ -409,11 +409,11 @@ export default function SettingsScreen() {
             <View className="gap-3">
               <View className="flex-row items-center justify-between">
                 <Text>Version</Text>
-                <Text className="text-muted-foreground">1.0.0</Text>
+                <Text className="text-muted-foreground">1.0.1</Text>
               </View>
               <View className="flex-row items-center justify-between">
                 <Text>Build</Text>
-                <Text className="text-muted-foreground">1</Text>
+                <Text className="text-muted-foreground">2</Text>
               </View>
             </View>
           </View>
