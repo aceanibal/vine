@@ -1,4 +1,5 @@
 import * as SecureStore from 'expo-secure-store';
+import * as LocalAuthentication from 'expo-local-authentication';
 
 // Use only allowed characters: alphanumeric, '.', '-', '_'
 const sanitizeAddress = (address: string) => address.replace(/[^a-zA-Z0-9]/g, '_');
@@ -31,6 +32,7 @@ export async function saveWalletSecrets(params: { address: string; privateKey: s
 }
 
 export async function loadWalletSecrets(address: string): Promise<{ privateKey: string | null; mnemonic: string | null; }> {
+  await ensureBiometricAuthOrThrow();
   if (!address) throw new Error('loadWalletSecrets: address is required');
   const pkKey = PRIVATE_KEY_KEY(address);
   const mnKey = MNEMONIC_KEY(address);
@@ -74,7 +76,22 @@ export async function removeWalletSecrets(address: string): Promise<void> {
   ]);
 }
 
+async function ensureBiometricAuthOrThrow(): Promise<void> {
+  // Allow device PIN/passcode fallback by keeping device fallback enabled
+  const result = await LocalAuthentication.authenticateAsync({
+    promptMessage: 'Authorize to access your wallet key',
+    cancelLabel: 'Cancel',
+    disableDeviceFallback: false,
+    requireConfirmation: false,
+  });
+  if (!result.success) {
+    // If neither biometrics nor device credentials succeed, fail hard
+    throw new Error('Authentication required: enable biometrics or device passcode to proceed');
+  }
+}
+
 export async function requirePrivateKey(address: string): Promise<string> {
+  await ensureBiometricAuthOrThrow();
   // Retry a few times to tolerate immediate read-after-write
   let attempts = 0;
   while (attempts < 3) {

@@ -14,7 +14,6 @@ import { removeWalletSecrets, loadWalletSecrets } from '~/lib/services/wallet-se
 import { CustomModal } from '~/components/CustomModal';
 import { Toast } from '~/components/Toast';
 import { RecoveryPhraseModal } from '~/components/RecoveryPhraseModal';
-import * as LocalAuthentication from 'expo-local-authentication';
  
 
 export default function SettingsScreen() {
@@ -119,71 +118,18 @@ export default function SettingsScreen() {
         setShowToast(true);
         return;
       }
-
-      // Check if biometric authentication is available
-      const hasHardware = await LocalAuthentication.hasHardwareAsync();
-      const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-      console.log('Biometric check:', { hasHardware, isEnrolled });
-
-      if (!hasHardware || !isEnrolled) {
-        console.log('Biometric not available');
-        
-        // For simulator testing - bypass biometric check
-        if (__DEV__) {
-          console.log('Development mode - bypassing biometric for simulator');
-          const { mnemonic } = await loadWalletSecrets(currentWallet.address);
-          if (!mnemonic) {
-            setToastConfig({
-              message: 'Recovery phrase not available.',
-              type: 'error'
-            });
-            setShowToast(true);
-            return;
-          }
-          setRecoveryMnemonic(mnemonic);
-          setShowRecoveryModal(true);
-          return;
-        }
-        
+      // Load and show recovery phrase without biometric requirement
+      const { mnemonic } = await loadWalletSecrets(currentWallet.address);
+      if (!mnemonic) {
         setToastConfig({
-          message: 'Biometric authentication is required to view recovery phrase.',
+          message: 'Recovery phrase not available.',
           type: 'error'
         });
         setShowToast(true);
         return;
       }
-
-      console.log('Requesting biometric authentication');
-      // Request biometric authentication
-      const result = await LocalAuthentication.authenticateAsync({
-        promptMessage: 'Authenticate to view recovery phrase',
-        fallbackLabel: 'Use passcode',
-        cancelLabel: 'Cancel',
-      });
-
-      console.log('Biometric result:', result);
-      if (result.success) {
-        console.log('Authentication successful, showing recovery modal');
-        // Show recovery phrase in bottom modal
-        const { mnemonic } = await loadWalletSecrets(currentWallet.address);
-        if (!mnemonic) {
-          setToastConfig({
-            message: 'Recovery phrase not available.',
-            type: 'error'
-          });
-          setShowToast(true);
-          return;
-        }
-        setRecoveryMnemonic(mnemonic);
-        setShowRecoveryModal(true);
-      } else {
-        console.log('Authentication failed');
-        setToastConfig({
-          message: 'Authentication failed.',
-          type: 'error'
-        });
-        setShowToast(true);
-      }
+      setRecoveryMnemonic(mnemonic);
+      setShowRecoveryModal(true);
     } catch (error) {
       console.error('Failed to load recovery phrase:', error);
       setToastConfig({

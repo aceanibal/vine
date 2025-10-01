@@ -4,7 +4,7 @@ import { View, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-nati
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
-import * as LocalAuthentication from 'expo-local-authentication';
+ 
 
 import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
@@ -27,7 +27,7 @@ export default function SendScreen() {
   const [recipientAddress, setRecipientAddress] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [inputMode, setInputMode] = useState<'token' | 'usd'>('token'); // 'token' or 'usd'
-  const [isAuthVerified, setIsAuthVerified] = useState(false);
+  const [isAuthVerified, setIsAuthVerified] = useState(true);
   const setAuthorizationSnapshot = useGlobalStore((s) => s.setAuthorizationSnapshot);
 
   // Component is ready when wallet is available
@@ -60,53 +60,7 @@ export default function SendScreen() {
     }, [currentWallet?.address])
   );
 
-  // Biometric authentication on screen load
-  useEffect(() => {
-    let cancelled = false;
-    const runAuth = async () => {
-      try {
-        const hasHardware = await LocalAuthentication.hasHardwareAsync();
-        const isEnrolled = await LocalAuthentication.isEnrolledAsync();
-
-        if (!hasHardware || !isEnrolled) {
-          if (__DEV__) {
-            console.log('Development mode - bypassing biometric for simulator');
-            if (!cancelled) setIsAuthVerified(true);
-            return;
-          }
-          Alert.alert(
-            'Authentication Required',
-            'Biometric authentication is required to access the send screen.',
-            [{ text: 'OK', onPress: () => router.back() }]
-          );
-          return;
-        }
-
-        const result = await LocalAuthentication.authenticateAsync({
-          promptMessage: 'Authenticate to continue',
-          fallbackLabel: 'Use passcode',
-          cancelLabel: 'Cancel',
-        });
-        if (result.success) {
-          if (!cancelled) setIsAuthVerified(true);
-        } else {
-          Alert.alert('Authentication Failed', 'Unable to authenticate.', [
-            { text: 'OK', onPress: () => router.back() },
-          ]);
-        }
-      } catch (e) {
-        console.error('Biometric auth error on load:', e);
-        Alert.alert('Authentication Error', 'Failed to perform biometric authentication.', [
-          { text: 'OK', onPress: () => router.back() },
-        ]);
-      }
-    };
-
-    runAuth();
-    return () => {
-      cancelled = true;
-    };
-  }, []);
+  // Biometric authentication removed: screen is accessible without auth
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
