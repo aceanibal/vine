@@ -8,7 +8,7 @@ import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore } from '~/lib/stores/useGlobalStore';
-import { approveAuthorizationWithTracking, revokeAuthorizationWithTracking, checkDelegationStatus } from '~/lib/services/sponsored-orchestrator';
+import { approveAuthorizationWithTracking, revokeAuthorizationWithTracking } from '~/lib/services/sponsored-orchestrator';
 import { removeWalletSecrets, loadWalletSecrets } from '~/lib/services/wallet-secure-store';
 
 import { CustomModal } from '~/components/CustomModal';
@@ -24,14 +24,13 @@ export default function SettingsScreen() {
   const authorizationStatus = useGlobalStore((state) => state.authorizationStatus);
   const isWalletAuthorized = useGlobalStore((state) => state.isWalletAuthorized);
   const checkWalletAuthorization = useGlobalStore((state) => state.checkWalletAuthorization);
-  const authorizeWallet = useGlobalStore((state) => state.authorizeWallet);
-  const setAuthorizationSnapshot = useGlobalStore((state) => state.setAuthorizationSnapshot);
   const orchestratorConfig = useGlobalStore((state) => state.orchestratorConfig);
   const isStoreLoading = useGlobalStore((state) => state.appState.isLoading);  
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isRevoking, setIsRevoking] = useState(false);
   const [isAuthorizing, setIsAuthorizing] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   const [showModal, setShowModal] = useState(false);
   const [modalConfig, setModalConfig] = useState({
@@ -236,17 +235,39 @@ export default function SettingsScreen() {
             <View className="flex-row items-center justify-between">
               <Text className="font-semibold">Authorization</Text>
               <TouchableOpacity 
-                onPress={() => checkWalletAuthorization()}
-                disabled={isStoreLoading}
+                onPress={async () => {
+                  if (!currentWallet?.address) return;
+                  setIsRefreshing(true);
+                  try {
+                    console.log('[Settings] Refreshing authorization status...');
+                    await checkWalletAuthorization();
+                    console.log('[Settings] Authorization status updated');
+                    setToastConfig({
+                      message: 'Authorization status refreshed',
+                      type: 'success',
+                    });
+                    setShowToast(true);
+                  } catch (e) {
+                    console.error('[Settings] Failed to refresh authorization:', e);
+                    setToastConfig({
+                      message: 'Failed to refresh authorization status',
+                      type: 'error',
+                    });
+                    setShowToast(true);
+                  } finally {
+                    setIsRefreshing(false);
+                  }
+                }}
+                disabled={isRefreshing || isStoreLoading}
                 className="flex-row items-center gap-1"
               >
                 <MaterialIcons 
                   name="refresh" 
                   size={16} 
-                  color={isStoreLoading ? colors.grey : colors.primary} 
+                  color={isRefreshing || isStoreLoading ? colors.grey : colors.primary} 
                 />
                 <Text className="text-xs text-primary font-medium">
-                  {isStoreLoading ? 'Loading...' : 'Refresh'}
+                  {isRefreshing ? 'Refreshing...' : 'Refresh'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -276,23 +297,17 @@ export default function SettingsScreen() {
                     if (!currentWallet?.address) return;
                     setIsAuthorizing(true);
                     try {
-                      const ok = await (async () => {
-                        if (!currentWallet?.address) return false;
-                        try {
-                          const res = await approveAuthorizationWithTracking(currentWallet.address);
-                          const status = await checkDelegationStatus(currentWallet.address);
-                          setAuthorizationSnapshot(status as any);
-                          return !!res.success;
-                        } catch (_e) {
-                          return false;
-                        }
-                      })();
+                      console.log('[Settings] Starting authorization...');
+                      const res = await approveAuthorizationWithTracking(currentWallet.address);
+                      // Use single source of truth to update status
+                      await checkWalletAuthorization();
                       setToastConfig({
-                        message: ok ? 'Authorization successful' : 'Authorization failed',
-                        type: ok ? 'success' : 'error',
+                        message: res.success ? 'Authorization successful' : 'Authorization failed',
+                        type: res.success ? 'success' : 'error',
                       });
                       setShowToast(true);
                     } catch (e: any) {
+                      console.error('[Settings] Authorization error:', e);
                       setToastConfig({ message: e?.message || 'Authorization failed', type: 'error' });
                       setShowToast(true);
                     } finally {
@@ -317,8 +332,8 @@ export default function SettingsScreen() {
                       console.log('[Settings] Revoke pressed');
                       const res = await revokeAuthorizationWithTracking(currentWallet.address);
                       console.log('[Settings] Revoke result:', res);
-                      const status = await checkDelegationStatus(currentWallet.address);
-                      setAuthorizationSnapshot(status as any);
+                      // Use single source of truth to update status
+                      await checkWalletAuthorization();
                       setToastConfig({
                         message: res.success ? `Authorization revoked${res.revokeTxHash ? ` (tx: ${res.revokeTxHash.slice(0,10)}...${res.revokeTxHash.slice(-8)})` : ''}` : 'Failed to revoke authorization',
                         type: res.success ? 'success' : 'error',

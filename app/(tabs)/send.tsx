@@ -10,7 +10,7 @@ import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore, useCurrentWallet, usePredefinedToken, useTokenBalance, useDefaultChainIdNumeric } from '~/lib/stores/useGlobalStore';
-import { checkDelegationStatus, executeSponsoredTransfer } from '~/lib/services/sponsored-orchestrator';
+import { executeSponsoredTransfer } from '~/lib/services/sponsored-orchestrator';
 
 export default function SendScreen() {
   const { colors } = useColorScheme();
@@ -18,6 +18,8 @@ export default function SendScreen() {
   const predefinedToken = usePredefinedToken();
   const tokenBalance = useTokenBalance();
   const defaultChainIdNumeric = useDefaultChainIdNumeric();
+  const checkWalletAuthorization = useGlobalStore((s) => s.checkWalletAuthorization);
+  const isWalletAuthorized = useGlobalStore((s) => s.isWalletAuthorized);
   
   const handleBackNavigation = () => {
     router.back();
@@ -28,36 +30,39 @@ export default function SendScreen() {
   const [isLoading, setIsLoading] = useState(false);
   const [inputMode, setInputMode] = useState<'token' | 'usd'>('token'); // 'token' or 'usd'
   const [isAuthVerified, setIsAuthVerified] = useState(true);
-  const setAuthorizationSnapshot = useGlobalStore((s) => s.setAuthorizationSnapshot);
 
   // Component is ready when wallet is available
   useEffect(() => {
     if (currentWallet?.address) {
-      console.log('Send: Wallet available, component ready');
+      console.log('[Send] Wallet available, component ready');
     }
   }, [currentWallet]);
 
   
 
-  // Ensure redirect when navigating into this screen (e.g., from Transfer)
+  // Check authorization when navigating into this screen - use single source of truth
   useFocusEffect(
     useCallback(() => {
       let active = true;
       (async () => {
         try {
           if (currentWallet?.address) {
-            const status = await checkDelegationStatus(currentWallet.address);
-            setAuthorizationSnapshot(status as any);
+            console.log('[Send] Checking wallet authorization...');
+            await checkWalletAuthorization();
+            // After checking, redirect if not authorized
             if (active && !useGlobalStore.getState().isWalletAuthorized) {
+              console.log('[Send] Wallet not authorized, redirecting to authorize screen');
               router.replace('/(tabs)/authorize');
             }
           }
-        } catch (_e) {}
+        } catch (e) {
+          console.error('[Send] Failed to check authorization:', e);
+        }
       })();
       return () => {
         active = false;
       };
-    }, [currentWallet?.address])
+    }, [currentWallet?.address, checkWalletAuthorization])
   );
 
   // Biometric authentication removed: screen is accessible without auth

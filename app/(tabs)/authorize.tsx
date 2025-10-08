@@ -8,28 +8,32 @@ import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore, useCurrentWallet } from '~/lib/stores/useGlobalStore';
-import { approveAuthorizationWithTracking, checkDelegationStatus } from '~/lib/services/sponsored-orchestrator';
+import { approveAuthorizationWithTracking } from '~/lib/services/sponsored-orchestrator';
 
 export default function AuthorizeScreen() {
   const { colors } = useColorScheme();
   const currentWallet = useCurrentWallet();
   const [isLoading, setIsLoading] = useState(false);
-  const setAuthorizationSnapshot = useGlobalStore((s) => s.setAuthorizationSnapshot);
+  const checkWalletAuthorization = useGlobalStore((s) => s.checkWalletAuthorization);
 
   const handleAuthorize = async () => {
     if (!currentWallet?.address) return;
     setIsLoading(true);
     try {
+      console.log('[Authorize] Starting authorization...');
       const res = await approveAuthorizationWithTracking(currentWallet.address);
       if (res.success) {
-        const status = await checkDelegationStatus(currentWallet.address);
-        setAuthorizationSnapshot(status as any);
+        console.log('[Authorize] Authorization successful, checking status...');
+        // Use single source of truth to update authorization status
+        await checkWalletAuthorization();
         if (useGlobalStore.getState().isWalletAuthorized) {
+          console.log('[Authorize] Wallet authorized, redirecting to send screen');
           router.replace('/(tabs)/send');
           return;
         }
       }
-    } catch (_e) {
+    } catch (e) {
+      console.error('[Authorize] Authorization failed:', e);
     } finally {
       setIsLoading(false);
     }

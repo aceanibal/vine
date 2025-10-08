@@ -231,7 +231,7 @@ export const useGlobalStore = create<GlobalState>()(
 
       // Orchestrator config (single source of truth)
       orchestratorConfig: {
-        delegationAddress: '0x9a686f5eae58b62b435eaa034d48e57dc94bc36c',
+        delegationAddress: '0xf1679e7a62788Ad3acD4FDe33137602eF321C2A6',
         providerUrl: 'https://polygon-rpc.com',
         relayerEndpoint: 'https://cpprhb1jz6.execute-api.us-east-1.amazonaws.com/relay',
         maxRetries: 30,
@@ -533,15 +533,34 @@ export const useGlobalStore = create<GlobalState>()(
         const state = get();
         const currentWallet = state.currentWallet;
         if (!currentWallet?.address) {
+          console.log('[GlobalStore] checkWalletAuthorization: no wallet address');
           return;
         }
         try {
+          console.log('[GlobalStore] checkWalletAuthorization: checking for', currentWallet.address);
           set((s) => ({
             appState: { ...s.appState, isLoading: true, error: null },
           }));
-          // No-op: UI will compute and call setAuthorizationSnapshot
-          set((s) => ({ appState: { ...s.appState, isLoading: false } }));
+          
+          // Import and call checkDelegationStatus
+          const { checkDelegationStatus } = await import('../services/sponsored-orchestrator');
+          const status = await checkDelegationStatus(currentWallet.address);
+          
+          console.log('[GlobalStore] checkWalletAuthorization: result', status);
+          
+          // Update authorization snapshot
+          const isAuthorized = !!(status.isDelegated && status.matchesTarget);
+          set((s) => ({
+            authorizationStatus: status,
+            isWalletAuthorized: isAuthorized,
+            appState: { 
+              ...s.appState, 
+              isLoading: false,
+              lastUpdated: new Date(),
+            },
+          }));
         } catch (error) {
+          console.error('[GlobalStore] checkWalletAuthorization: error', error);
           set((s) => ({
             appState: {
               ...s.appState,
@@ -553,31 +572,9 @@ export const useGlobalStore = create<GlobalState>()(
       },
 
       authorizeWallet: async () => {
-        const state = get();
-        const currentWallet = state.currentWallet;
-        if (!currentWallet?.address) {
-          console.log('GlobalStore.authorizeWallet: no current wallet');
-          return false;
-        }
-        try {
-          set((s) => ({
-            appState: { ...s.appState, isLoading: true, error: null },
-          }));
-          console.log('GlobalStore.authorizeWallet: start', { address: currentWallet.address });
-          // No-op: UI/service will perform authorization
-          set((s) => ({ appState: { ...s.appState, isLoading: false } }));
-          return false;
-        } catch (error) {
-          console.log('GlobalStore.authorizeWallet: error', error);
-          set((s) => ({
-            appState: {
-              ...s.appState,
-              isLoading: false,
-              error: error instanceof Error ? error.message : 'Authorization failed',
-            },
-          }));
-          return false;
-        }
+        // Deprecated: Authorization is handled directly in UI components
+        console.warn('[GlobalStore] authorizeWallet is deprecated - use approveAuthorizationWithTracking from sponsored-orchestrator');
+        return false;
       },
 
       setAuthorizationSnapshot: (status: AuthorizationStatus) => {
