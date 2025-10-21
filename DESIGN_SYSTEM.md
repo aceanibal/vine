@@ -220,52 +220,6 @@ import { Button } from 'react-native-paper';
 - Full width: `style={{ width: '100%' }}`
 - Touch target: `paddingVertical: 12` (or 8 for compact buttons)
 
-### Info/Warning Boxes
-
-**Key Features:**
-- **Centered layout**: Icon and title centered using `items-center`
-- **Icon size**: `size={28}` for prominence
-- **Padding**: `p-6` for comfortable spacing
-- **Background opacity**: Use `/10` or `/20` for subtle backgrounds
-- **Text hierarchy**: Title with dynamic sizing, body with `text-xs`
-
-**Info Box (Blue):**
-```tsx
-<View className="gap-3 rounded-xl bg-blue-50 p-6 dark:bg-blue-950/20">
-  <View className="items-center gap-2">
-    <MaterialIcons name="info" size={28} color="#3b82f6" />
-    <Text 
-      className="text-blue-600 dark:text-blue-400"
-      numberOfLines={1}
-      adjustsFontSizeToFit
-    >
-      Title
-    </Text>
-  </View>
-  <Text className="text-xs text-blue-700 dark:text-blue-300">
-    Message content that provides helpful information.
-  </Text>
-</View>
-```
-
-**Warning Box (Cambridge Blue):**
-```tsx
-<View className="gap-3 rounded-xl bg-cambridge-blue/10 p-6">
-  <View className="items-center gap-2">
-    <MaterialIcons name="warning" size={28} color="#7FAFA1" />
-    <Text 
-      className="text-lapis-lazuli"
-      numberOfLines={1}
-      adjustsFontSizeToFit
-    >
-      Warning Title
-    </Text>
-  </View>
-  <Text className="text-xs text-lapis-lazuli">
-    Warning message content that provides important information.
-  </Text>
-</View>
-```
 
 ### Input Fields
 - Border: `border-border`
@@ -442,4 +396,32 @@ For elegant, tappable actions:
 2. **Touch targets**: Buttons with `paddingVertical: 12` minimum
 3. **Color contrast**: Ensure text is readable against backgrounds
 4. **Consistent sizing**: Use the defined font size hierarchy
+
+## Screen Patterns
+
+### Settings Screen Example
+Reference implementation: `app/(tabs)/settings.tsx`
+
+**Section Structure:**
+- Section titles: `text-lapis-lazuli/80`, fontSize 20-24, font-bold
+- Content organized in info boxes with centered icons
+- Dynamic backgrounds based on state
+
+**Key Patterns:**
+1. **Wallet Section**: 
+   - Label: `text-lapis-lazuli/80`
+   - Address: `text-lapis-lazuli font-bold font-mono`
+   - Recovery phrase action: TouchableOpacity card with `bg-lapis-lazuli/10`
+
+2. **Authorization Section**:
+   - Refresh button: `text-blue-green` for extra pop
+   - Status box with dynamic background: `cambridge-blue/10` (success) or `boston-red/10` (error)
+   - Details in two-column layout: labels `text-lapis-lazuli/80`, values `text-lapis-lazuli`
+   - Action button contained within info box
+
+3. **Delete Wallet Section**:
+   - Warning box with `bg-cambridge-blue/10`
+   - Boston-red icon for destructive action
+   - Description: `text-lapis-lazuli`
+   - Destructive button with boston-red/10 background
 
