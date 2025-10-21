@@ -189,19 +189,36 @@ import { Button } from 'react-native-paper';
 </Button>
 ```
 
-**Button Props:**
-- `mode="contained"` - Filled button style
-- Primary: `buttonColor="#225D7C"` - Lapis lazuli background
-- Secondary: `buttonColor="#7FAFA1"` - Cambridge blue background
-- **Disabled state**: Use color at 10% opacity (0.1 alpha) background, white text
-  - Primary disabled: `rgba(34, 93, 124, 0.1)` background
-  - Secondary disabled: `rgba(127, 175, 161, 0.1)` background
-  - Text stays white (`#FFFFFF`) in all states
-  - **IMPORTANT**: Do NOT use `disabled={true}` prop - control state via buttonColor and early return in onPress
-- Text: `fontSize: 18` with white color, font-semibold
+**Destructive Button:**
+```tsx
+<Button 
+  mode="contained"
+  buttonColor="rgba(252, 126, 126, 0.1)"
+  onPress={handleDestructiveAction}
+  style={{ width: '100%' }}
+  contentStyle={{ flexDirection: 'row-reverse', paddingVertical: 12 }}
+>
+  <Text 
+    className="text-boston-red font-semibold" 
+    numberOfLines={1} 
+    adjustsFontSizeToFit
+    style={{ fontSize: 18 }}
+  >
+    Delete
+  </Text>
+</Button>
+```
+
+**Button Guidelines:**
+- Primary: `buttonColor="#225D7C"` with white text
+- Secondary: `buttonColor="#7FAFA1"` with white text
+- Destructive: `buttonColor="rgba(252, 126, 126, 0.1)"` with boston-red text
+- Disabled: Use `lapis-lazuli/50` or `rgba(34, 93, 124, 0.5)` with white text
+- Cancel: `buttonColor="rgba(34, 93, 124, 0.1)"` with lapis-lazuli text
 - Always include `numberOfLines={1}` and `adjustsFontSizeToFit`
-- Full width buttons with `style={{ width: '100%' }}`
-- Content style with `paddingVertical: 12` for proper touch target
+- Text fontSize: 18 for primary actions, 16 for secondary/modal buttons
+- Full width: `style={{ width: '100%' }}`
+- Touch target: `paddingVertical: 12` (or 8 for compact buttons)
 
 ### Info/Warning Boxes
 
@@ -286,12 +303,75 @@ import { Button } from 'react-native-paper';
 
 ### Icons
 - Use `@expo/vector-icons` MaterialIcons
+- **Info box icons**: `size={48}` - Large centered icons for info/warning boxes
 - **Feature icons**: `size={32}` - Large icons for feature lists
 - **Navigation/header icons**: `size={24}` - Standard navigation
 - **Button icons**: `size={20}` - Small icons within buttons
-- **Loading icons**: `size={48}` - Large centered icons
-- **Colors**: Use lapis-lazuli (#225D7C) for primary icons
-- Always use explicit hex colors for consistency
+- **Colors**: cambridge-blue for success, boston-red for errors/warnings, lapis-lazuli for neutral
+
+### Info/Warning Boxes
+Standard pattern for displaying information, warnings, or status:
+
+```tsx
+<View className="gap-3 rounded-xl bg-cambridge-blue/10 p-6">
+  <View className="items-center gap-2">
+    <MaterialIcons name="check-circle" size={48} color="#7FAFA1" />
+    <Text 
+      className="text-lapis-lazuli"
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      style={{ fontSize: 20 }}
+    >
+      Title
+    </Text>
+  </View>
+  <Text className="text-xs text-center text-lapis-lazuli">
+    Description text
+  </Text>
+  {/* Optional button */}
+</View>
+```
+
+**Variants:**
+- Success/Info: `bg-cambridge-blue/10`, icon color `#7FAFA1`
+- Error/Warning: `bg-boston-red/10`, icon color `#FC7E7E`
+- Neutral: `bg-lapis-lazuli/10`, icon color `#225D7C`
+- Dynamic: Change background based on state (e.g., authorized vs not authorized)
+
+### TouchableOpacity Cards
+For elegant, tappable actions:
+
+```tsx
+<TouchableOpacity 
+  onPress={handleAction}
+  className="rounded-xl bg-lapis-lazuli/10 p-6"
+  activeOpacity={0.7}
+>
+  <View className="items-center gap-3">
+    <MaterialIcons name="visibility" size={48} color="#225D7C" />
+    <Text 
+      className="text-lapis-lazuli/80 font-semibold text-center"
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      style={{ fontSize: 16 }}
+    >
+      Action Label
+    </Text>
+  </View>
+</TouchableOpacity>
+```
+
+**Usage:** View recovery phrase, settings actions, card-style navigation
+
+### Modals (CustomModal)
+- Large centered icon (size 48)
+- Title: `text-lapis-lazuli`, fontSize 20, centered
+- Message: `text-lapis-lazuli`, fontSize 15, centered
+- White background (`bg-white`)
+- Buttons:
+  - Confirm: Dynamic background (cambridge-blue/10 or boston-red/10) with matching text color
+  - Cancel: lapis-lazuli/10 background with lapis-lazuli text
+  - Both buttons use `flex-1` for equal width
 
 ## Spacing
 
