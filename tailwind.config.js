@@ -42,6 +42,18 @@ module.exports = {
           DEFAULT: withOpacity('card'),
           foreground: withOpacity('card-foreground'),
         },
+        'lapis-lazuli': '#225D7C',
+        'cambridge-blue': '#7FAFA1',
+        'blue-green': '#3499BC',
+        'celadon': '#A8CFB7',
+        'hunyadi-yellow': '#D9A848',
+        'boston-red': '#FC7E7E',
+      },
+      fontFamily: {
+        sans: platformSelect({
+          ios: ['-apple-system', 'BlinkMacSystemFont', 'San Francisco'],
+          android: ['Roboto', 'sans-serif'],
+        }),
       },
       borderWidth: {
         hairline: hairlineWidth(),

@@ -221,7 +221,7 @@ export const useGlobalStore = create<GlobalState>()(
       defaultChainIdNumeric: 137, // Default to Polygon mainnet
       predefinedToken: {
         address: '0x756715CF771C82aFB371B9C9f9Dd64E690766351',
-        symbol: 'XRBG',
+        symbol: 'Gold',
         name: 'XRB Gold',
         decimals: 18,
         price: 121,
@@ -231,7 +231,7 @@ export const useGlobalStore = create<GlobalState>()(
 
       // Orchestrator config (single source of truth)
       orchestratorConfig: {
-        delegationAddress: '0xf1679e7a62788Ad3acD4FDe33137602eF321C2A6',
+        delegationAddress: '0x9a686F5eaE58B62B435EAa034d48E57dc94BC36c',
         providerUrl: 'https://polygon-rpc.com',
         relayerEndpoint: 'https://cpprhb1jz6.execute-api.us-east-1.amazonaws.com/relay',
         maxRetries: 30,
@@ -663,11 +663,11 @@ export const useGlobalStore = create<GlobalState>()(
         try {
           const next = { ...(persisted || {}) };
           const pt = next.predefinedToken || null;
-          const shouldMigrate = !pt || pt.symbol !== 'XRBG' || pt.address !== '0x756715CF771C82aFB371B9C9f9Dd64E690766351';
+          const shouldMigrate = !pt || pt.symbol !== 'Gold' || pt.address !== '0x756715CF771C82aFB371B9C9f9Dd64E690766351';
           if (shouldMigrate) {
             next.predefinedToken = {
               address: '0x756715CF771C82aFB371B9C9f9Dd64E690766351',
-              symbol: 'XRBG',
+              symbol: 'Gold',
               name: 'XRB Gold',
               decimals: 18,
               price: (pt && typeof pt.price === 'number') ? pt.price : 121,
@@ -708,7 +708,7 @@ export const useGlobalStore = create<GlobalState>()(
             console.log('GlobalStore: Setting predefined token after rehydration');
             state.predefinedToken = {
               address: '0x756715CF771C82aFB371B9C9f9Dd64E690766351',
-              symbol: 'XRBG',
+              symbol: 'Gold',
               name: 'XRB Gold',
               decimals: 18,
               price: 121,
@@ -719,15 +719,15 @@ export const useGlobalStore = create<GlobalState>()(
             state.predefinedToken.price = 121;
           }
 
-          // If store was previously USDC or missing logo, force XRBG migration in-memory too
+          // If store was previously USDC or missing logo, force Gold migration in-memory too
           if (
-            state.predefinedToken.symbol !== 'XRBG' ||
+            state.predefinedToken.symbol !== 'Gold' ||
             state.predefinedToken.address !== '0x756715CF771C82aFB371B9C9f9Dd64E690766351'
           ) {
-            console.log('GlobalStore: Migrating predefined token to XRBG on rehydration');
+            console.log('GlobalStore: Migrating predefined token to Gold on rehydration');
             state.predefinedToken = {
               address: '0x756715CF771C82aFB371B9C9f9Dd64E690766351',
-              symbol: 'XRBG',
+              symbol: 'Gold',
               name: 'XRB Gold',
               decimals: 18,
               price: typeof state.predefinedToken.price === 'number' ? state.predefinedToken.price : 121,

@@ -4,7 +4,7 @@ import { View, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 
-import { Button } from '~/components/nativewindui/Button';
+import { Button } from 'react-native-paper';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore } from '~/lib/stores/useGlobalStore';
@@ -144,86 +144,94 @@ export default function SettingsScreen() {
   if (isLoading) {
     return (
       <View className="flex-1 items-center justify-center">
-        <Text>Loading settings...</Text>
+        <Text className="text-lapis-lazuli">Loading settings...</Text>
       </View>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-row items-center justify-between px-2 py-4 border-b border-border bg-white">
-        <View className="w-6" />
-        <Text className="text-lg font-bold">
-          Settings
-        </Text>
-        <View className="w-6" />
-      </View>
-      <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">
-        <View className="gap-6">
+    <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
+      <ScrollView className="flex-1 mt-6" contentContainerStyle={{ flexGrow: 1 }}>
+        <View className="flex-1 rounded-t-3xl bg-white p-6">
+        <View className="gap-8">
 
           {/* Wallet Section */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="font-semibold">
+          <View className="gap-4">
+            <Text className="text-xl font-bold text-lapis-lazuli/80 mb-2">
               Wallet
             </Text>
             
             {walletAddress ? (
               <View className="gap-4">
                 {/* Wallet Info */}
-                <View className="gap-2">
-                  <Text className="font-bold">
-                    XRBG Gold Wallet
+                <View className="gap-2 pb-4">
+                  <Text className="text-base font-semibold text-lapis-lazuli/80">
+                    Wallet Address
                   </Text>
-                  <Text className="text-xs text-muted-foreground break-all">
-                    {walletAddress}
+                  <Text 
+                    className="text-lapis-lazuli font-bold font-mono" 
+                    style={{ fontSize: 20, lineHeight: 28 }}
+                    numberOfLines={2} 
+                    adjustsFontSizeToFit
+                  >
+                    {walletAddress ? (() => {
+                      const prefix = walletAddress.slice(0, 2); // 0x
+                      const rest = walletAddress.slice(2);
+                      const chunks: string[] = [];
+                      for (let i = 0; i < rest.length; i += 10) {
+                        chunks.push(rest.slice(i, i + 10));
+                      }
+                      const firstRow = `${prefix} ${chunks[0] || ''}${chunks[1] ? ' ' + chunks[1] : ''}`;
+                      const secondRow = `   ${chunks[2] || ''}${chunks[3] ? ' ' + chunks[3] : ''}`;
+                      return `${firstRow}\n${secondRow}`.trim();
+                    })() : ''}
                   </Text>
                 </View>
 
                 {/* Wallet Actions */}
-                <View className="gap-3">
-                  <Button 
-                    variant="secondary" 
-                    className="flex-row items-center justify-start gap-3"
-                    onPress={handleViewRecoveryPhrase}
-                  >
-                    <MaterialIcons name="visibility" size={20} color={colors.primary} />
-                    <Text>View Recovery Phrase</Text>
-                  </Button>
-                  
-
-                  
-                  <Button 
-                    variant="secondary"
-                    className="flex-row items-center justify-start gap-3 border-red-500"
-                    onPress={handleDeleteWallet}
-                  >
-                    <MaterialIcons name="delete" size={20} color={colors.destructive} />
-                    <Text className="text-red-500">Delete Wallet</Text>
-                  </Button>
-                </View>
+                <TouchableOpacity 
+                  onPress={handleViewRecoveryPhrase}
+                  className="rounded-xl bg-lapis-lazuli/10 p-6"
+                  activeOpacity={0.7}
+                >
+                  <View className="items-center gap-3">
+                    <MaterialIcons name="visibility" size={48} color="#225D7C" />
+                    <Text 
+                      className="text-lapis-lazuli/80 font-semibold text-center"
+                      numberOfLines={1}
+                      adjustsFontSizeToFit
+                      style={{ fontSize: 16 }}
+                    >
+                      View Recovery Phrase
+                    </Text>
+                  </View>
+                </TouchableOpacity>
               </View>
             ) : (
-              <View className="gap-3">
-                <Text className="text-center text-muted-foreground">
+              <View className="gap-4">
+                <Text className="text-center text-blue-green mb-2">
                   No wallet found. Create or import a wallet to get started.
                 </Text>
                 
                 <View className="gap-3">
                   <Button 
-                    className="flex-row items-center justify-center gap-3"
+                    mode="contained"
+                    buttonColor="#225D7C"
                     onPress={handleCreateWallet}
+                    style={{ width: '100%' }}
+                    contentStyle={{ flexDirection: 'row-reverse', paddingVertical: 8 }}
                   >
-                    <MaterialIcons name="add-circle" size={20} color="white" />
-                    <Text>Create New Wallet</Text>
+                    <Text className="text-white" numberOfLines={1} adjustsFontSizeToFit>Create New Wallet</Text>
                   </Button>
                   
                   <Button 
-                    variant="secondary"
-                    className="flex-row items-center justify-center gap-3"
+                    mode="contained"
+                    buttonColor="#225D7C"
                     onPress={handleImportWallet}
+                    style={{ width: '100%' }}
+                    contentStyle={{ flexDirection: 'row-reverse', paddingVertical: 8 }}
                   >
-                    <MaterialIcons name="file-download" size={20} color={colors.primary} />
-                    <Text>Import Existing Wallet</Text>
+                    <Text className="text-white" numberOfLines={1} adjustsFontSizeToFit>Import Existing Wallet</Text>
                   </Button>
                 </View>
               </View>
@@ -231,9 +239,9 @@ export default function SettingsScreen() {
           </View>
 
           {/* Authorization Section */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <View className="flex-row items-center justify-between">
-              <Text className="font-semibold">Authorization</Text>
+          <View className="gap-4">
+            <View className="flex-row items-center justify-between mb-2">
+              <Text className="text-xl font-bold text-lapis-lazuli/80">Authorization</Text>
               <TouchableOpacity 
                 onPress={async () => {
                   if (!currentWallet?.address) return;
@@ -263,125 +271,158 @@ export default function SettingsScreen() {
               >
                 <MaterialIcons 
                   name="refresh" 
-                  size={16} 
-                  color={isRefreshing || isStoreLoading ? colors.grey : colors.primary} 
+                  size={18} 
+                  color={isRefreshing || isStoreLoading ? '#9CA3AF' : '#3499BC'} 
                 />
-                <Text className="text-xs text-primary font-medium">
+                <Text className="text-sm text-blue-green font-medium">
                   {isRefreshing ? 'Refreshing...' : 'Refresh'}
                 </Text>
               </TouchableOpacity>
             </View>
-            <View className="gap-3">
-              <View className="flex-row items-center justify-between">
-                <Text>Status</Text>
-                <Text className={isStoreLoading ? 'text-muted-foreground' : (isWalletAuthorized ? 'text-green-600' : 'text-red-600')}>
-                  {isStoreLoading ? '(loading)' : (isWalletAuthorized ? 'Authorized' : 'Not Authorized')}
-                </Text>
+            <View className="gap-4">
+              <View className={`gap-4 rounded-xl p-6 ${isStoreLoading ? 'bg-cambridge-blue/10' : (isWalletAuthorized ? 'bg-cambridge-blue/10' : 'bg-boston-red/10')}`}>
+                <View className="items-center gap-2">
+                  <MaterialIcons 
+                    name={isStoreLoading ? 'sync' : (isWalletAuthorized ? 'check-circle' : 'cancel')} 
+                    size={28} 
+                    color={isStoreLoading ? '#9CA3AF' : (isWalletAuthorized ? '#7FAFA1' : '#FC7E7E')} 
+                  />
+                  <Text 
+                    className={`font-semibold ${isStoreLoading ? 'text-gray-500' : (isWalletAuthorized ? 'text-cambridge-blue' : 'text-boston-red')}`}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    style={{ fontSize: 20 }}
+                  >
+                    {isStoreLoading ? 'Loading...' : (isWalletAuthorized ? 'Authorized' : 'Not Authorized')}
+                  </Text>
+                </View>
+                <View className="gap-2">
+                  <View className="flex-row items-start gap-2">
+                    <Text className="text-xs text-lapis-lazuli/80 font-medium" style={{ width: 120 }}>
+                      Delegated To:
+                    </Text>
+                    <Text className="text-xs text-lapis-lazuli flex-1" numberOfLines={2}>
+                      {authorizationStatus?.delegatedTo || '—'}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-start gap-2">
+                    <Text className="text-xs text-lapis-lazuli/80 font-medium" style={{ width: 120 }}>
+                      Matches Target:
+                    </Text>
+                    <Text className="text-xs text-lapis-lazuli flex-1">
+                      {authorizationStatus?.matchesTarget ? 'Yes' : 'No'}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-start gap-2">
+                    <Text className="text-xs text-lapis-lazuli/80 font-medium" style={{ width: 120 }}>
+                      Contract:
+                    </Text>
+                    <Text className="text-xs text-lapis-lazuli flex-1 font-mono" numberOfLines={2}>
+                      {orchestratorConfig.delegationAddress}
+                    </Text>
+                  </View>
+                </View>
+                {/* Authorize (only when not authorized) */}
+                {!isWalletAuthorized && (
+                  <Button
+                    mode="contained"
+                    buttonColor="#225D7C"
+                    onPress={async () => {
+                      if (!currentWallet?.address) return;
+                      setIsAuthorizing(true);
+                      try {
+                        console.log('[Settings] Starting authorization...');
+                        const res = await approveAuthorizationWithTracking(currentWallet.address);
+                        // Use single source of truth to update status
+                        await checkWalletAuthorization();
+                        setToastConfig({
+                          message: res.success ? 'Authorization successful' : 'Authorization failed',
+                          type: res.success ? 'success' : 'error',
+                        });
+                        setShowToast(true);
+                      } catch (e: any) {
+                        console.error('[Settings] Authorization error:', e);
+                        setToastConfig({ message: e?.message || 'Authorization failed', type: 'error' });
+                        setShowToast(true);
+                      } finally {
+                        setIsAuthorizing(false);
+                      }
+                    }}
+                    disabled={isAuthorizing || isStoreLoading}
+                    style={{ width: '100%' }}
+                    contentStyle={{ flexDirection: 'row-reverse', paddingVertical: 8 }}
+                  >
+                    <Text className="text-white" numberOfLines={1} adjustsFontSizeToFit>{isAuthorizing ? 'Authorizing...' : 'Authorize Wallet'}</Text>
+                  </Button>
+                )}
+                {/* Revoke Authorization moved below details (only when authorized) */}
+                {isWalletAuthorized && (
+                  <Button
+                    mode="contained"
+                    buttonColor="#225D7C"
+                    onPress={async () => {
+                      if (!currentWallet?.address) return;
+                      setIsRevoking(true);
+                      try {
+                        console.log('[Settings] Revoke pressed');
+                        const res = await revokeAuthorizationWithTracking(currentWallet.address);
+                        console.log('[Settings] Revoke result:', res);
+                        // Use single source of truth to update status
+                        await checkWalletAuthorization();
+                        setToastConfig({
+                          message: res.success ? `Authorization revoked${res.revokeTxHash ? ` (tx: ${res.revokeTxHash.slice(0,10)}...${res.revokeTxHash.slice(-8)})` : ''}` : 'Failed to revoke authorization',
+                          type: res.success ? 'success' : 'error',
+                        });
+                        setShowToast(true);
+                      } catch (e: any) {
+                        console.log('[Settings] Revoke error:', e);
+                        setToastConfig({ message: e?.message || 'Revocation failed', type: 'error' });
+                        setShowToast(true);
+                      } finally {
+                        setIsRevoking(false);
+                      }
+                    }}
+                    disabled={isRevoking}
+                    style={{ width: '100%' }}
+                    contentStyle={{ flexDirection: 'row-reverse', paddingVertical: 8 }}
+                  >
+                    <Text className="text-white" numberOfLines={1} adjustsFontSizeToFit>{isRevoking ? 'Revoking...' : 'Revoke Authorization'}</Text>
+                  </Button>
+                )}
               </View>
-              <View>
-                <Text className="text-xs text-muted-foreground">
-                  Delegated To: {authorizationStatus?.delegatedTo || '—'}
-                </Text>
-                <Text className="text-xs text-muted-foreground">
-                  Matches Target: {authorizationStatus?.matchesTarget ? 'Yes' : 'No'}
-                </Text>
-                <Text className="text-xs text-muted-foreground">
-                  Delegation Contract: {orchestratorConfig.delegationAddress}
-                </Text>
-              </View>
-              {/* Authorize (only when not authorized) */}
-              {!isWalletAuthorized && (
-                <Button
-                  className="flex-row items-center justify-start gap-3"
-                  onPress={async () => {
-                    if (!currentWallet?.address) return;
-                    setIsAuthorizing(true);
-                    try {
-                      console.log('[Settings] Starting authorization...');
-                      const res = await approveAuthorizationWithTracking(currentWallet.address);
-                      // Use single source of truth to update status
-                      await checkWalletAuthorization();
-                      setToastConfig({
-                        message: res.success ? 'Authorization successful' : 'Authorization failed',
-                        type: res.success ? 'success' : 'error',
-                      });
-                      setShowToast(true);
-                    } catch (e: any) {
-                      console.error('[Settings] Authorization error:', e);
-                      setToastConfig({ message: e?.message || 'Authorization failed', type: 'error' });
-                      setShowToast(true);
-                    } finally {
-                      setIsAuthorizing(false);
-                    }
-                  }}
-                  disabled={isAuthorizing || isStoreLoading}
-                >
-                  <MaterialIcons name="check-circle" size={20} color="white" />
-                  <Text>{isAuthorizing ? 'Authorizing...' : 'Authorize Wallet'}</Text>
-                </Button>
-              )}
-              {/* Revoke Authorization moved below details (only when authorized) */}
-              {isWalletAuthorized && (
-                <Button
-                  variant="secondary"
-                  className="flex-row items-center justify-start gap-3"
-                  onPress={async () => {
-                    if (!currentWallet?.address) return;
-                    setIsRevoking(true);
-                    try {
-                      console.log('[Settings] Revoke pressed');
-                      const res = await revokeAuthorizationWithTracking(currentWallet.address);
-                      console.log('[Settings] Revoke result:', res);
-                      // Use single source of truth to update status
-                      await checkWalletAuthorization();
-                      setToastConfig({
-                        message: res.success ? `Authorization revoked${res.revokeTxHash ? ` (tx: ${res.revokeTxHash.slice(0,10)}...${res.revokeTxHash.slice(-8)})` : ''}` : 'Failed to revoke authorization',
-                        type: res.success ? 'success' : 'error',
-                      });
-                      setShowToast(true);
-                    } catch (e: any) {
-                      console.log('[Settings] Revoke error:', e);
-                      setToastConfig({ message: e?.message || 'Revocation failed', type: 'error' });
-                      setShowToast(true);
-                    } finally {
-                      setIsRevoking(false);
-                    }
-                  }}
-                  disabled={isRevoking}
-                >
-                  <MaterialIcons name="block" size={20} color={colors.primary} />
-                  <Text className="text-primary">{isRevoking ? 'Revoking...' : 'Revoke Authorization'}</Text>
-                </Button>
-              )}
-              
-
-              
             </View>
           </View>
 
           {/* Active Chains Section - removed in XRBG branch */}
 
+          {/* Delete Wallet Section - only show if wallet exists */}
+          {walletAddress && (
+            <View className="gap-4 mt-auto pt-8">
+              <View className="gap-3 rounded-xl bg-cambridge-blue/10 p-6">
+                <View className="items-center gap-2">
+                  <MaterialIcons name="warning" size={28} color="#225D7C" />
 
-          {/* App Info Section */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="font-semibold">
-              App Info
-            </Text>
-            <View className="gap-3">
-              <View className="flex-row items-center justify-between">
-                <Text>Version</Text>
-                <Text className="text-muted-foreground">1.0.1</Text>
-              </View>
-              <View className="flex-row items-center justify-between">
-                <Text>Build</Text>
-                <Text className="text-muted-foreground">2</Text>
+                </View>
+                <Text className="text-xs text-center text-lapis-lazuli">
+                  This will permanently delete your wallet address and private keys from this device. Make sure you have backed up your recovery phrase before proceeding.
+                </Text>
+                <Button 
+                  mode="contained"
+                  buttonColor="rgba(252, 126, 126, 0.1)"
+                  onPress={handleDeleteWallet}
+                  style={{ width: '100%' }}
+                  contentStyle={{ flexDirection: 'row-reverse', paddingVertical: 8 }}
+                >
+                  <Text className="text-boston-red font-semibold" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 18 }}>Delete Wallet</Text>
+                </Button>
               </View>
             </View>
-          </View>
+          )}
+
+        
+        </View>
         </View>
       </ScrollView>
-
-
 
       {/* Custom Modal */}
       <CustomModal
@@ -408,7 +449,6 @@ export default function SettingsScreen() {
         type={toastConfig.type}
         onHide={() => setShowToast(false)}
       />
-
     </SafeAreaView>
   );
 } 

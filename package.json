@@ -27,12 +27,14 @@
     "expo-router": "~6.0.8",
     "expo-secure-store": "~15.0.7",
     "expo-status-bar": "~3.0.8",
+    "lucide-react-native": "^0.545.0",
     "nativewind": "latest",
     "react": "19.1.0",
     "react-dom": "19.1.0",
     "react-native": "0.81.4",
     "react-native-gesture-handler": "~2.28.0",
     "react-native-get-random-values": "^1.11.0",
+    "react-native-paper": "^5.14.5",
     "react-native-qrcode-svg": "^6.3.15",
     "react-native-reanimated": "~4.1.0",
     "react-native-safe-area-context": "~5.6.0",
@@ -40,6 +42,7 @@
     "react-native-uitextview": "2.0.0-rc.10",
     "react-native-web": "^0.21.0",
     "tailwind-merge": "^2.2.1",
+    "victory-native": "^41.20.1",
     "zustand": "^5.0.7"
   },
   "devDependencies": {

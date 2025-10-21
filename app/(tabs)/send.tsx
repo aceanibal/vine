@@ -1,62 +1,66 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { View, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, TouchableOpacity, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
- 
+import { Button } from 'react-native-paper';
 
-import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
+import { NumberPad } from '~/components/NumberPad';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { useGlobalStore, useCurrentWallet, usePredefinedToken, useTokenBalance, useDefaultChainIdNumeric } from '~/lib/stores/useGlobalStore';
-import { executeSponsoredTransfer } from '~/lib/services/sponsored-orchestrator';
+import { useGlobalStore, useCurrentWallet, usePredefinedToken, useTokenBalance } from '~/lib/stores/useGlobalStore';
 
-export default function SendScreen() {
+export default function AmountScreen() {
   const { colors } = useColorScheme();
   const currentWallet = useCurrentWallet();
   const predefinedToken = usePredefinedToken();
   const tokenBalance = useTokenBalance();
-  const defaultChainIdNumeric = useDefaultChainIdNumeric();
   const checkWalletAuthorization = useGlobalStore((s) => s.checkWalletAuthorization);
-  const isWalletAuthorized = useGlobalStore((s) => s.isWalletAuthorized);
-  
-  const handleBackNavigation = () => {
-    router.back();
-  };
   
   const [amount, setAmount] = useState('');
-  const [recipientAddress, setRecipientAddress] = useState('');
-  const [isLoading, setIsLoading] = useState(false);
-  const [inputMode, setInputMode] = useState<'token' | 'usd'>('token'); // 'token' or 'usd'
-  const [isAuthVerified, setIsAuthVerified] = useState(true);
+  const [inputMode, setInputMode] = useState<'token' | 'usd'>('token');
 
-  // Component is ready when wallet is available
-  useEffect(() => {
-    if (currentWallet?.address) {
-      console.log('[Send] Wallet available, component ready');
+  // Handle number pad key press
+  const handleKeyPress = (key: string) => {
+    if (key === 'backspace') {
+      setAmount((prev) => prev.slice(0, -1));
+    } else if (key === '.') {
+      // Only allow one decimal point
+      if (!amount.includes('.')) {
+        setAmount((prev) => prev + key);
+      }
+    } else {
+      // Limit decimal places based on input mode
+      if (amount.includes('.')) {
+        const [, decimal] = amount.split('.');
+        // USD mode: always limit to 2 decimals
+        // Token mode: limit to token decimals (but allow user to type more)
+        const maxDecimals = inputMode === 'usd' ? 2 : (predefinedToken?.decimals || 18);
+        if (decimal.length >= maxDecimals) {
+          return;
+        }
+      }
+      setAmount((prev) => prev + key);
     }
-  }, [currentWallet]);
+  };
 
-  
-
-  // Check authorization when navigating into this screen - use single source of truth
+  // Check authorization when navigating into this screen
   useFocusEffect(
     useCallback(() => {
       let active = true;
       (async () => {
         try {
           if (currentWallet?.address) {
-            console.log('[Send] Checking wallet authorization...');
+            console.log('[Send Amount] Checking wallet authorization...');
             await checkWalletAuthorization();
-            // After checking, redirect if not authorized
             if (active && !useGlobalStore.getState().isWalletAuthorized) {
-              console.log('[Send] Wallet not authorized, redirecting to authorize screen');
-              router.replace('/(tabs)/authorize');
+              console.log('[Send Amount] Wallet not authorized, redirecting to authorize screen');
+              router.replace('/send/authorize');
             }
           }
         } catch (e) {
-          console.error('[Send] Failed to check authorization:', e);
+          console.error('[Send Amount] Failed to check authorization:', e);
         }
       })();
       return () => {
@@ -64,8 +68,6 @@ export default function SendScreen() {
       };
     }, [currentWallet?.address, checkWalletAuthorization])
   );
-
-  // Biometric authentication removed: screen is accessible without auth
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
@@ -113,10 +115,9 @@ export default function SendScreen() {
     return usdAmount / predefinedToken.price;
   };
 
-  // Format token amount to match predefined token decimals
+  // Format token amount to 2 decimals by default
   const formatTokenAmount = (tokenAmount: number) => {
-    if (!predefinedToken?.decimals) return tokenAmount.toFixed(6); // fallback to 6 decimals
-    return tokenAmount.toFixed(predefinedToken.decimals);
+    return tokenAmount.toFixed(2);
   };
 
   // Get the actual token amount to send (always in token units)
@@ -138,19 +139,6 @@ export default function SendScreen() {
     return formatTokenAmount(tokenAmount);
   };
 
-  // Get the display amount for the current input mode
-  const getDisplayAmount = () => {
-    if (!amount) return 0;
-    const amountNumber = parseFloat(amount);
-    if (isNaN(amountNumber)) return 0;
-    
-    if (inputMode === 'token') {
-      return amountNumber;
-    } else {
-      return amountNumber;
-    }
-  };
-
   // Handle input mode toggle
   const toggleInputMode = () => {
     if (!amount) {
@@ -162,37 +150,21 @@ export default function SendScreen() {
     if (isNaN(currentAmount)) return;
 
     if (inputMode === 'token') {
-      // Converting from token to USD
+      // Converting from token to USD (always 2 decimals)
       const usdValue = calculateUSDValue(currentAmount);
-      setAmount(usdValue.toString());
+      setAmount(usdValue.toFixed(2));
       setInputMode('usd');
     } else {
-      // Converting from USD to token
+      // Converting from USD to token (show 2 decimals by default)
       const tokenValue = calculateTokenAmount(currentAmount);
-      // Format the token value to match token decimals
-      const formattedTokenValue = formatTokenAmount(tokenValue);
-      setAmount(formattedTokenValue);
+      setAmount(tokenValue.toFixed(2));
       setInputMode('token');
     }
   };
 
-  // Calculate network fee (2.5% of transfer amount)
-  const calculateNetworkFee = (transferAmount: number) => {
-    return transferAmount * 0.025; // 2.5%
-  };
-
-  // Format network fee with more precision for small amounts
-  const formatNetworkFee = (feeAmount: number) => {
-    if (feeAmount < 0.01) {
-      // For very small amounts, show more decimal places
-      return `$${feeAmount.toFixed(6)}`;
-    }
-    return formatCurrency(feeAmount);
-  };
-
-  const handleSend = async () => {
-    if (!amount || !recipientAddress || !predefinedToken) {
-      Alert.alert('Error', 'Please fill in all fields');
+  const handleContinue = () => {
+    if (!amount || !predefinedToken) {
+      Alert.alert('Error', 'Please enter an amount');
       return;
     }
 
@@ -202,12 +174,7 @@ export default function SendScreen() {
       return;
     }
 
-    if (!currentWallet?.address) {
-      Alert.alert('Error', 'No wallet available');
-      return;
-    }
-
-    // Validate balance - use actual token amount for validation
+    // Validate balance
     const actualTokenAmount = getActualTokenAmount();
     const currentBalance = parseFloat(getTokenBalance());
     if (actualTokenAmount > currentBalance) {
@@ -215,269 +182,108 @@ export default function SendScreen() {
       return;
     }
 
-    // Single-chain app; no chain support check needed
-
-    // Ensure auth was completed
-    if (!isAuthVerified) {
-      Alert.alert('Authentication Required', 'Please authenticate to proceed.');
-      return;
-    }
-
-    
-
-    setIsLoading(true);
-    
-    try {
-      router.replace('/(tabs)/active-transaction' as any);
-      await executeSponsoredTransfer({
-        fromAddress: currentWallet.address,
-        tokenAddress: predefinedToken.address,
-        toAddress: recipientAddress,
-        amount: getActualTokenAmount().toString(),
-      });
-
-      setIsLoading(false);
-    } catch (error: any) {
-      setIsLoading(false);
-      console.error('Sponsored transaction error:', error);
-      Alert.alert(
-        'Transaction Failed',
-        error.message || 'An unexpected error occurred',
-        [{ text: 'OK' }]
-      );
-    }
+    // Navigate to address screen with amount data
+    router.push({
+      pathname: '/send/address',
+      params: {
+        amount: actualTokenAmount.toString(),
+        inputMode,
+      },
+    });
   };
 
-
-  // No token selector in XRBG branch
-
   return (
-    !isAuthVerified ? (
-      <SafeAreaView className="flex-1 bg-white items-center justify-center">
-        <Text>Authenticating...</Text>
-      </SafeAreaView>
-    ) : (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-row items-center justify-between p-4 border-b border-border bg-white">
-        <TouchableOpacity onPress={handleBackNavigation}>
-          <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
-        </TouchableOpacity>
-        <Text className="text-lg font-bold">
-          Send
-        </Text>
-        <View className="w-6" />
-      </View>
-
-      <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">
-        <View className="gap-6">
-          {/* Token Details */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="text-lg font-semibold">Token Details</Text>
-            {predefinedToken ? (
-              <View className="gap-3">
-                <View className="flex-row items-center justify-between">
-                  <Text className="font-semibold">{predefinedToken.name}</Text>
-                  <Text className="text-sm text-muted-foreground">{predefinedToken.symbol}</Text>
-                </View>
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-sm text-muted-foreground">Price</Text>
-                  <Text className="font-semibold">{formatCurrency(predefinedToken.price)}</Text>
-                </View>
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-sm text-muted-foreground">Balance</Text>
-                  <Text className="font-semibold">{formatTokenAmount(parseFloat(getTokenBalance()))} {predefinedToken.symbol}</Text>
-                </View>
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-sm text-muted-foreground">Value</Text>
-                  <Text className="font-semibold">{formatCurrency(calculateUSDValue(parseFloat(getTokenBalance())))}</Text>
-                </View>
-              </View>
-            ) : (
-              <Text className="text-sm text-muted-foreground">No token configured</Text>
-            )}
-          </View>
-
-  
-
-          {/* Amount Input */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <View className="flex-row items-center justify-between">
-              <Text className="text-lg font-semibold">
-                Amount
+    <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
+      <View className="flex-1 rounded-t-3xl bg-white mt-6">
+        {/* Main Content - Fixed Layout */}
+        <View className="flex-1 p-4 gap-4">
+        {/* Title */}
+        <View className="items-center py-2">
+          <Text className="text-2xl font-bold text-lapis-lazuli" numberOfLines={1}>
+            Enter Amount
+          </Text>
+        </View>
+        {/* Token Info */}
+        {predefinedToken ? (
+          <View className="flex-row items-center justify-between px-4 py-3 rounded-xl">
+            <View className="flex-1 mr-2">
+              <Text className="text-sm text-blue-green" numberOfLines={1}>Balance</Text>
+              <Text className="text-base font-semibold text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit>
+                {inputMode === 'token' 
+                  ? `${parseFloat(getTokenBalance()).toFixed(2)} ${predefinedToken.symbol}`
+                  : formatCurrency(calculateUSDValue(parseFloat(getTokenBalance())))
+                }
               </Text>
-              <TouchableOpacity 
-                onPress={toggleInputMode}
-                className="flex-row items-center gap-2 px-3 py-2 rounded-lg bg-primary/10"
-              >
-                <Text className="text-sm font-medium text-primary">
-                  {inputMode === 'token' ? 'USD' : 'Token'}
-                </Text>
-                <MaterialIcons name="swap-horiz" size={16} color={colors.primary} />
-              </TouchableOpacity>
             </View>
-            <View className="gap-3">
-              <View className="flex-row items-center gap-3">
-                <View className="flex-1">
-                  <TextInput
-                    value={amount}
-                    onChangeText={setAmount}
-                    placeholder={
-                      inputMode === 'token' 
-                        ? (predefinedToken ? `${formatTokenAmount(0)} ${predefinedToken.symbol}` : '0.00')
-                        : '0.00'
-                    }
-                    keyboardType="decimal-pad"
-                    className="text-lg font-bold"
-                    style={{ color: colors.foreground }}
-                  />
-                  {predefinedToken && amount && (
-                    <Text className="text-xs text-muted-foreground">
-                      {inputMode === 'token' 
-                        ? `≈ ${formatCurrency(calculateUSDValue(parseFloat(amount) || 0))}`
-                        : `≈ ${getFormattedTokenAmount()} ${predefinedToken.symbol}`
-                      }
-                    </Text>
-                  )}
-                </View>
-              </View>
-              <View className="flex-row items-center gap-2">
-                <MaterialIcons 
-                  name={inputMode === 'token' ? 'attach-money' : 'token'} 
-                  size={14} 
-                  color={colors.grey3} 
-                />
-                <Text className="text-xs text-muted-foreground">
-                  {inputMode === 'token' 
-                    ? `Enter amount in ${predefinedToken?.symbol || 'tokens'}`
-                    : 'Enter amount in USD'
-                  }
-                </Text>
-              </View>
-            </View>
+            <TouchableOpacity 
+              onPress={toggleInputMode}
+              className="flex-row items-center gap-2 px-3 py-2 rounded-lg flex-shrink-0"
+            >
+              <MaterialIcons name="swap-horiz" size={18} color="#225D7C" />
+              <Text className="text-sm font-medium text-cambridge-blue" numberOfLines={1}>
+                {inputMode === 'token' ? predefinedToken.symbol : 'USD'}
+              </Text>
+            </TouchableOpacity>
           </View>
-
-          {/* Recipient Address */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="font-semibold">
-              Recipient Address
-            </Text>
-            <View className="gap-3">
-              <TextInput
-                value={recipientAddress}
-                onChangeText={setRecipientAddress}
-                placeholder="Enter wallet address"
-                className="p-3 border border-border rounded-lg bg-background"
-                style={{ color: colors.foreground }}
-                multiline
-              />
-              <Text className="text-xs text-muted-foreground">
-                Double-check the address before sending
+        ) : (
+          <View className="rounded-xl border border-hunyadi-yellow bg-celadon p-4">
+            <View className="flex-row items-center gap-2">
+              <MaterialIcons name="info" size={16} color="#D9A848" />
+              <Text className="text-sm font-semibold text-hunyadi-yellow" numberOfLines={2}>
+                Token not configured
               </Text>
             </View>
           </View>
+        )}
 
-          {/* Transaction Summary */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="font-semibold">
-              Transaction Summary
+        {/* Amount Display */}
+        <View className="flex-1 items-center justify-center gap-2 px-4">
+          <Text className="text-6xl font-bold text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit>
+            {amount || '0'}
+          </Text>
+          {predefinedToken && amount && (
+            <Text className="text-xl text-blue-green" numberOfLines={1} adjustsFontSizeToFit>
+              {inputMode === 'token' 
+                ? `≈ ${formatCurrency(calculateUSDValue(parseFloat(amount) || 0))}`
+                : `≈ ${getFormattedTokenAmount()} ${predefinedToken.symbol}`
+              }
             </Text>
-            <View className="gap-3">
-              <View className="flex-row items-center justify-between">
-                <Text className="text-muted-foreground">
-                  Amount
-                </Text>
-                <Text className="font-semibold">
-                  {getFormattedTokenAmount()} {predefinedToken?.symbol || ''}
-                </Text>
-              </View>
-              <View className="flex-row items-center justify-between">
-                <Text className="text-muted-foreground">
-                  Value (USD)
-                </Text>
-                <Text className="font-semibold">
-                  {formatCurrency(calculateUSDValue(getActualTokenAmount()))}
-                </Text>
-              </View>
-              <View className="flex-row items-center justify-between">
-                <Text className="text-muted-foreground">
-                  Network Fee (2.5%)
-                </Text>
-                <View className="flex-row items-center gap-1">
-                  <Text className="font-semibold text-red-600">
-                    {formatNetworkFee(calculateNetworkFee(calculateUSDValue(getActualTokenAmount())))}
-                  </Text>
-                </View>
-              </View>
-              <View className="flex-row items-center justify-between">
-                <Text className="text-muted-foreground">
-                  Fee Status
-                </Text>
-                <View className="flex-row items-center gap-1">
-                  <MaterialIcons name="check-circle" size={14} color="#16a34a" />
-                  <Text className="font-semibold text-green-600">
-                    WAIVED
-                  </Text>
-                </View>
-              </View>
-              <View className="border-t border-border pt-3">
-                <View className="flex-row items-center justify-between">
-                  <Text className="font-semibold">
-                    Total Cost
-                  </Text>
-                  <Text className="font-bold text-green-600">
-                    {formatCurrency(calculateUSDValue(getActualTokenAmount()))}
-                  </Text>
-                </View>
-                <View className="flex-row items-center justify-between mt-1">
-                  <Text className="text-sm text-muted-foreground">
-                    + Network Fee
-                  </Text>
-                  <Text className="text-sm text-green-600">
-                    {formatNetworkFee(calculateNetworkFee(calculateUSDValue(getActualTokenAmount())))} (Waived)
-                  </Text>
-                </View>
-              </View>
-            </View>
-          </View>
-
-          {/* Send Button */}
-          <Button 
-            size="lg" 
-            className="mt-4"
-            onPress={handleSend}
-            disabled={isLoading || !amount || !recipientAddress || !predefinedToken || !isAuthVerified}
-          >
-            {isLoading ? (
-              <View className="flex-row items-center gap-2">
-                <MaterialIcons name="hourglass-empty" size={20} color="white" />
-                <Text>Sending...</Text>
-              </View>
-            ) : (
-              <View className="flex-row items-center gap-2">
-                <MaterialIcons name="stars" size={20} color="white" />
-                <Text>Send {predefinedToken?.symbol || 'Token'} (FREE)</Text>
-              </View>
-            )}
-          </Button>
-
-
-          {/* Info */}
-          {!predefinedToken && (
-            <View className="rounded-xl border border-yellow-200 bg-yellow-50 p-4">
-              <View className="flex-row items-center gap-2 mb-2">
-                <MaterialIcons name="info" size={16} color="#d97706" />
-                <Text className="text-sm font-semibold text-yellow-700">
-                  Token not configured
-                </Text>
-              </View>
-              <Text className="text-xs text-yellow-600">
-                Please configure a predefined token in the app settings.
+          )}
+          {/* Insufficient balance warning */}
+          {amount && predefinedToken && getActualTokenAmount() > parseFloat(getTokenBalance()) && (
+            <View className="flex-row items-center gap-1 mt-2">
+              <MaterialIcons name="error" size={16} color="#dc2626" />
+              <Text className="text-sm font-semibold text-red-600" numberOfLines={1}>
+                Insufficient balance
               </Text>
             </View>
           )}
+          <Text className="text-sm text-blue-green mt-2" numberOfLines={2}>
+            {inputMode === 'token' 
+              ? `Amount in ${predefinedToken?.symbol || 'tokens'}`
+              : 'Amount in USD'
+            }
+          </Text>
         </View>
-      </ScrollView>
+
+        {/* Number Pad */}
+        <View className="gap-4">
+          <NumberPad onKeyPress={handleKeyPress} />
+          
+          {/* Continue Button */}
+          <Button 
+            mode="contained"
+            onPress={handleContinue}
+            disabled={!amount || !predefinedToken}
+            style={{ backgroundColor: '#225D7C', paddingVertical: 8 }}
+            labelStyle={{ fontSize: 16 }}
+          >
+            Continue
+          </Button>
+        </View>
+        </View>
+      </View>
     </SafeAreaView>
-    )
   );
 }
+

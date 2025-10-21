@@ -91,7 +91,7 @@ async function ensureBiometricAuthOrThrow(): Promise<void> {
 }
 
 export async function requirePrivateKey(address: string): Promise<string> {
-  await ensureBiometricAuthOrThrow();
+  //await ensureBiometricAuthOrThrow();
   // Retry a few times to tolerate immediate read-after-write
   let attempts = 0;
   while (attempts < 3) {

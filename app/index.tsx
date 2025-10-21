@@ -4,7 +4,7 @@ import { Platform, View, ScrollView, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
 
-import { Button } from '~/components/nativewindui/Button';
+import { Button } from 'react-native-paper';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useCurrentWallet, useIsWalletCreated, useGlobalStore } from '~/lib/stores/useGlobalStore';
@@ -57,116 +57,135 @@ export default function WelcomeConsentScreen() {
   // Show loading state while checking wallet or until store is hydrated
   if (isCheckingWallet || !_hasHydrated) {
     return (
-      <SafeAreaView className="flex-1 bg-white">
+      <SafeAreaView className="flex-1">
         <View className="flex-1 items-center justify-center">
-          <MaterialIcons name="hourglass-empty" size={48} color={colors.primary} />
-          <Text className="mt-4 text-lg font-semibold">Loading...</Text>
+          <MaterialIcons name="hourglass-empty" size={48} color="#225D7C" />
+          <Text 
+            className="mt-4 font-semibold text-lapis-lazuli"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            style={{ fontSize: 18 }}
+          >
+            Loading...
+          </Text>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1">
-      <ScrollView 
-        className="flex-1" 
-        contentContainerClassName="px-8 py-4"
-        showsVerticalScrollIndicator={false}
-      >
-        <View className="mx-auto max-w-sm gap-6">
+    <SafeAreaView className="flex-1 bg-white">
+      <View className="flex-1 px-8 py-10">
+        <View className="flex-1 justify-between">
           {/* Header */}
-          <View className="ios:pt-8 pt-12">
-            <Text className="ios:text-left ios:font-black text-center">
+          <View className="gap-2">
+            <Text 
+              className="text-2xl text-center text-lapis-lazuli"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              style={{ fontSize: 24, minHeight: 32 }}
+            >
               Welcome to
             </Text>
             <Text
-              className="ios:text-left ios:font-black text-primary text-center">
-              XRB Gold Wallet
+              className="text-center text-lapis-lazuli font-bold"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              style={{ fontSize: 48, minHeight: 56 }}
+            >
+              Metals
             </Text>
           </View>
 
           {/* Features */}
-          <View className="gap-6">
+          <View className="gap-10 py-4">
             {FEATURES.map((feature) => (
-              <View key={feature.title} className="flex-row gap-4">
-                <View className="pt-px">
+              <View key={feature.title} className="flex-row gap-5">
+                <View className="pt-1">
                   <MaterialIcons
                     name={feature.icon}
                     size={32}
-                    color={colors.primary}
+                    color="#225D7C"
                   />
                 </View>
                 <View className="flex-1">
-                  <Text className="font-bold">{feature.title}</Text>
-                  <Text>{feature.description}</Text>
+                  <Text 
+                    className="text-lapis-lazuli mb-2"
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                    style={{ fontSize: 20, minHeight: 26 }}
+                  >
+                    {feature.title}
+                  </Text>
+                  <Text 
+                    className="text-blue-green"
+                    numberOfLines={3}
+                    adjustsFontSizeToFit
+                    style={{ fontSize: 15, lineHeight: 22, minHeight: 66 }}
+                  >
+                    {feature.description}
+                  </Text>
                 </View>
               </View>
             ))}
           </View>
 
-          {/* Buttons */}
+          {/* Buttons at bottom */}
           <View className="gap-4">
-            <View className="gap-3">
-              <Button 
-                size={Platform.select({ ios: 'lg', default: 'md' })}
-                onPress={handleCreateWallet}
+            <Button 
+              mode="contained"
+              buttonColor="#225D7C"
+              onPress={handleCreateWallet}
+              style={{ width: '100%' }}
+              contentStyle={{ flexDirection: 'row-reverse', paddingVertical: 12 }}
+            >
+              <Text 
+                className="font-semibold" 
+                numberOfLines={1} 
+                adjustsFontSizeToFit
+                style={{ fontSize: 18, color: '#FFFFFF' }}
               >
-                <MaterialIcons name="add-circle" size={20} color="white" />
-                <Text>Create New Vine Wallet</Text>
-              </Button>
-              <Button 
-                variant="secondary"
-                size={Platform.select({ ios: 'lg', default: 'md' })}
-                onPress={handleImportWallet}
+                Create New Wallet
+              </Text>
+            </Button>
+            <Button 
+              mode="contained"
+              buttonColor="#7FAFA1"
+              onPress={handleImportWallet}
+              style={{ width: '100%' }}
+              contentStyle={{ flexDirection: 'row-reverse', paddingVertical: 12 }}
+            >
+              <Text 
+                className="font-semibold" 
+                numberOfLines={1} 
+                adjustsFontSizeToFit
+                style={{ fontSize: 18, color: '#FFFFFF' }}
               >
-                <MaterialIcons name="file-download" size={20} color={colors.primary} />
-                <Text>Import Existing Wallet</Text>
-              </Button>
-            </View>
-          </View>
-
-          {/* Footer */}
-          <View className="items-center gap-2">
-            <MaterialIcons
-              name="cloud-sync"
-              size={20}
-              color={colors.primary}
-            />
-            <Text className="text-xs text-center">
-              Vine connects to secure backend services for easy crypto management and account recovery. By continuing, you agree to our{' '}
-              <Link href="/">
-                <Text className="text-xs text-primary">
-                  Terms of Service
-                </Text>
-              </Link>{' '}
-              and{' '}
-              <Link href="/">
-                <Text className="text-xs text-primary">
-                  Privacy Policy
-                </Text>
-              </Link>
-            </Text>
+                Import Existing Wallet
+              </Text>
+            </Button>
           </View>
         </View>
-      </ScrollView>
+      </View>
     </SafeAreaView>
   );
 }
 
 const FEATURES = [
   {
-    title: 'Backend-Powered Security',
-    description: 'Your wallet connects to secure backend services for enhanced protection and easy recovery',
+    title: 'Effortless Digital Assets',
+    description: 'Experience the benefits of blockchain ownership without the gas fees or technical complexity — everything just works.',
     icon: 'cloud-sync',
   },
   {
-    title: 'Account Recovery',
-    description: 'Never lose access to your funds with our advanced account recovery system',
-    icon: 'restore',
+    title: 'Asset Recovery',
+    description: 'Recover lost access or compromised assets through our secure, backend-assisted recovery framework.',
+    icon: 'recycling',
   },
   {
-    title: 'Simplified Crypto',
-    description: 'Complex crypto operations made simple through our intelligent backend services',
-    icon: 'auto-awesome',
+    title: 'Verified & Audited Assets',
+    description: 'All assets are verified and undergo regular audits to ensure authenticity and transparency.',
+    icon: 'verified',
   },
 ] as const;
+

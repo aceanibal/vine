@@ -1,4 +1,4 @@
-import { MaterialIcons } from '@expo/vector-icons';
+import { Briefcase, UserCircle, Send } from 'lucide-react-native';
 import { Tabs } from 'expo-router';
 
 export default function TabLayout() {
@@ -6,48 +6,48 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarActiveTintColor: '#007AFF',
-        tabBarInactiveTintColor: '#8E8E93',
+        tabBarShowLabel: false,
+        tabBarActiveTintColor: '#FFFFFF', // celadon
+        tabBarInactiveTintColor: '#FFFFFF80', // white/50
+        tabBarStyle: {
+          height: 60,
+          paddingBottom: 4,
+          paddingTop: 4,
+          backgroundColor: '#225D7C', // lapis-lazuli
+          borderTopWidth: 0,
+          borderTopLeftRadius: 0,
+          borderTopRightRadius: 0,
+        },
+        tabBarIconStyle: {
+          marginTop: 0,
+        },
       }}
     >
       <Tabs.Screen
         name="dashboard"
         options={{
-          title: 'Wallet',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="account-balance-wallet" size={size} color={color} />
-          ),
-        }}
-      />
-
-      <Tabs.Screen
-        name="transfer"
-        options={{
-          title: 'Transfer',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="send" size={size} color={color} />
-          ),
-        }}
-      />
-      <Tabs.Screen
-        name="settings"
-        options={{
-          title: 'Settings',
-          tabBarIcon: ({ color, size }) => (
-            <MaterialIcons name="settings" size={size} color={color} />
+          title: 'Portfolio',
+          tabBarIcon: ({ color }) => (
+            <Briefcase size={24} color={color} strokeWidth={2} />
           ),
         }}
       />
       <Tabs.Screen
         name="send"
         options={{
-          href: null, // This hides the tab from the bottom navigation
+          title: 'Send',
+          tabBarIcon: ({ color }) => (
+            <Send size={24} color={color} strokeWidth={2} />
+          ),
         }}
       />
       <Tabs.Screen
-        name="authorize"
+        name="settings"
         options={{
-          href: null, // hidden route used for authorization flow
+          title: 'Profile',
+          tabBarIcon: ({ color }) => (
+            <UserCircle size={24} color={color} strokeWidth={2} />
+          ),
         }}
       />
       <Tabs.Screen
@@ -60,13 +60,6 @@ export default function TabLayout() {
         name="transactions"
         options={{
           href: null, // This hides the tab from the bottom navigation
-        }}
-      />
-
-      <Tabs.Screen
-        name="active-transaction"
-        options={{
-          href: null, // hidden route for active transaction screen
         }}
       />
 

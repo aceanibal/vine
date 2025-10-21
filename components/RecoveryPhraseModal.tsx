@@ -1,7 +1,7 @@
 import React from 'react';
-import { Modal, View, Text, TouchableOpacity, Dimensions } from 'react-native';
+import { Modal, View, TouchableOpacity, Dimensions } from 'react-native';
 import { MaterialIcons } from '@expo/vector-icons';
-import { useColorScheme } from '~/lib/useColorScheme';
+import { Text } from '~/components/nativewindui/Text';
 
 interface RecoveryPhraseModalProps {
   visible: boolean;
@@ -12,7 +12,14 @@ interface RecoveryPhraseModalProps {
 const { height: screenHeight } = Dimensions.get('window');
 
 export function RecoveryPhraseModal({ visible, onClose, mnemonic }: RecoveryPhraseModalProps) {
-  const { colors } = useColorScheme();
+  // Lapis-lazuli theme colors
+  const colors = {
+    card: '#FFFFFF',
+    background: '#F3F4F6',
+    grey: '#6B7280',
+    foreground: '#225D7C',
+    primary: '#225D7C',
+  };
   const words = mnemonic.split(' ');
 
   return (
@@ -46,8 +53,10 @@ export function RecoveryPhraseModal({ visible, onClose, mnemonic }: RecoveryPhra
           {/* Header */}
           <View className="flex-row justify-between items-center mb-5">
             <Text 
-              className="text-xl font-bold" 
-              style={{ color: colors.foreground }}
+              className="font-bold text-lapis-lazuli"
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              style={{ fontSize: 20 }}
             >
               Recovery Phrase
             </Text>
@@ -57,16 +66,20 @@ export function RecoveryPhraseModal({ visible, onClose, mnemonic }: RecoveryPhra
           </View>
 
           {/* Warning */}
-          <View 
-            className="flex-row items-center p-3 rounded-lg mb-5" 
-            style={{ backgroundColor: colors.background }}
-          >
-            <MaterialIcons name="warning" size={20} color={colors.primary} />
-            <Text 
-              className="ml-2 text-sm font-medium" 
-              style={{ color: colors.primary }}
-            >
-              Keep this phrase safe and never share it with anyone
+          <View className="gap-3 rounded-xl bg-cambridge-blue/10 p-6 mb-5">
+            <View className="items-center gap-2">
+              <MaterialIcons name="warning" size={28} color="#7FAFA1" />
+              <Text 
+                className="text-lapis-lazuli"
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                style={{ fontSize: 20 }}
+              >
+                Keep This Phrase Safe
+              </Text>
+            </View>
+            <Text className="text-xs text-center text-lapis-lazuli">
+              Never share it with anyone. This is the only way to recover your wallet.
             </Text>
           </View>
 
@@ -75,18 +88,19 @@ export function RecoveryPhraseModal({ visible, onClose, mnemonic }: RecoveryPhra
             {words.map((word, index) => (
               <View 
                 key={index} 
-                className="flex-row items-center px-3 py-2 rounded-lg mb-2 w-[48%]" 
-                style={{ backgroundColor: colors.background }}
+                className="flex-row items-center px-3 py-2 rounded-lg mb-2 w-[48%] bg-cambridge-blue/10"
               >
                 <Text 
-                  className="text-xs mr-1 font-medium" 
-                  style={{ color: colors.grey }}
+                  className="text-xs mr-1 font-medium text-blue-green"
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                 >
                   {index + 1}.
                 </Text>
                 <Text 
-                  className="text-sm font-semibold" 
-                  style={{ color: colors.foreground }}
+                  className="text-sm font-semibold text-lapis-lazuli"
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                 >
                   {word}
                 </Text>
@@ -96,10 +110,7 @@ export function RecoveryPhraseModal({ visible, onClose, mnemonic }: RecoveryPhra
 
           {/* Instructions */}
           <View className="items-center">
-            <Text 
-              className="text-xs text-center leading-4" 
-              style={{ color: colors.grey }}
-            >
+            <Text className="text-xs text-center leading-4 text-blue-green">
               Write down each word in order. You'll need this to recover your wallet.
             </Text>
           </View>

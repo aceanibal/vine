@@ -37,41 +37,19 @@ export default function ReceiveScreen() {
     if (currentWallet?.address) {
       try {
         await Clipboard.setStringAsync(currentWallet.address);
-        Alert.alert('Success', 'Address copied to clipboard!');
       } catch (error) {
         console.error('Failed to copy to clipboard:', error);
-        Alert.alert('Error', 'Failed to copy address to clipboard. Please try again.');
-      }
-    }
-  };
-
-  const shareAddress = async () => {
-    if (currentWallet?.address) {
-      try {
-        // Copy to clipboard as a sharing mechanism for now
-        await Clipboard.setStringAsync(currentWallet.address);
-        Alert.alert('Ready to Share', 'Address copied to clipboard. You can now paste it in any messaging app to share.');
-      } catch (error) {
-        console.error('Failed to prepare address for sharing:', error);
-        Alert.alert('Error', 'Failed to prepare address for sharing. Please try again.');
       }
     }
   };
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-white">
-        <View className="flex-row items-center justify-between p-4 border-b border-border bg-white">
-          <TouchableOpacity onPress={handleBackNavigation}>
-            <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
-          </TouchableOpacity>
-          <Text className="font-bold">
-            Receive
-          </Text>
-          <View className="w-6" />
-        </View>
-        <View className="flex-1 bg-gray-50 items-center justify-center">
-          <Text>Loading wallet...</Text>
+      <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
+        <View className="flex-1 rounded-t-3xl bg-white mt-6">
+          <View className="flex-1 items-center justify-center">
+            <Text className="text-lapis-lazuli">Loading wallet...</Text>
+          </View>
         </View>
       </SafeAreaView>
     );
@@ -79,129 +57,65 @@ export default function ReceiveScreen() {
 
   if (!currentWallet?.address) {
     return (
-      <SafeAreaView className="flex-1 bg-white">
-        <View className="flex-row items-center justify-between p-4 border-b border-border bg-white">
-          <TouchableOpacity onPress={handleBackNavigation}>
-            <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
-          </TouchableOpacity>
-          <Text className="font-bold">
-            Receive
-          </Text>
-          <View className="w-6" />
-        </View>
-        <View className="flex-1 bg-gray-50 items-center justify-center p-4">
-          <MaterialIcons name="account-balance-wallet" size={64} color={colors.grey} />
-          <Text className="mt-4 text-center font-bold">
-            No Wallet Found
-          </Text>
-          <Text className="mt-2 text-center text-muted-foreground">
-            Create a wallet to receive cryptocurrencies
-          </Text>
+      <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
+        <View className="flex-1 rounded-t-3xl bg-white mt-6">
+          <View className="flex-1 items-center justify-center p-4">
+            <MaterialIcons name="account-balance-wallet" size={64} color="#7FAFA1" />
+            <Text className="mt-4 text-center font-bold text-lapis-lazuli">
+              No Wallet Found
+            </Text>
+            <Text className="mt-2 text-center text-blue-green">
+              Create a wallet to receive cryptocurrencies
+            </Text>
+          </View>
         </View>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-row items-center justify-between p-4 border-b border-border bg-white">
-        <TouchableOpacity onPress={handleBackNavigation}>
-          <MaterialIcons name="arrow-back" size={24} color={colors.foreground} />
-        </TouchableOpacity>
-        <Text className="font-bold">
-          Receive
-        </Text>
-        <View className="w-6" />
-      </View>
-
-      <ScrollView className="flex-1 bg-gray-50" contentContainerClassName="p-4">
-        <View className="gap-6">
+    <SafeAreaView className="flex-1 bg-blue-green" edges={['top']}>
+      <ScrollView className="flex-1" contentContainerClassName="p-6">
+        <View className="gap-4">
           {/* QR Code Section */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="font-semibold text-center">
+          <View className="items-center">
+            <Text className="font-semibold text-center text-lapis-lazuli mb-3">
               Your Wallet Address
             </Text>
-            <View className="items-center gap-4">
-              <View className="bg-white p-4 rounded-lg">
-                <QRCode
-                  value={currentWallet?.address || ''}
-                  size={200}
-                  color="black"
-                  backgroundColor="white"
-                />
-              </View>
-              <Text className="text-xs text-muted-foreground text-center">
-                Scan this QR code to send cryptocurrencies to your wallet
-              </Text>
+            <View className="bg-white p-4 rounded-xl overflow-hidden">
+              <QRCode
+                value={currentWallet?.address || ''}
+                size={200}
+                color="black"
+                backgroundColor="white"
+              />
             </View>
+            <Text className="text-xs text-lapis-lazuli text-center mt-3">
+              Scan this QR code to send cryptocurrencies to your wallet
+            </Text>
           </View>
 
           {/* Wallet Address */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="font-semibold">
+          <View className="mt-4">
+            <Text className="font-semibold text-lapis-lazuli mb-2">
               Wallet Address
             </Text>
-            <View className="gap-3">
-              <View className="p-3 border border-border rounded-lg bg-background">
-                <Text className="font-mono text-center">
-                  {currentWallet?.address}
-                </Text>
-              </View>
-              <Text className="text-xs text-muted-foreground text-center">
-                Share this address to receive cryptocurrencies
-              </Text>
-            </View>
-          </View>
-
-          {/* Action Buttons */}
-          <View className="gap-3">
-            <Button 
-              variant="secondary"
-              className="flex-row items-center justify-center gap-3"
-              onPress={copyToClipboard}
-            >
-              <MaterialIcons name="content-copy" size={20} color={colors.primary} />
-              <Text>Copy Address</Text>
-            </Button>
-            
-            <Button 
-              variant="secondary"
-              className="flex-row items-center justify-center gap-3"
-              onPress={shareAddress}
-            >
-              <MaterialIcons name="share" size={20} color={colors.primary} />
-              <Text>Share Address</Text>
-            </Button>
-          </View>
-
-          
-
-          {/* Security Tips */}
-          <View className="gap-4 rounded-xl border border-border bg-card p-6">
-            <Text className="font-semibold">
-              Security Tips
+            <Text className="font-mono text-lapis-lazuli">
+              {currentWallet?.address}
             </Text>
-            <View className="gap-3">
-              <View className="flex-row items-start gap-3">
-                <MaterialIcons name="security" size={16} color={colors.primary} className="mt-0.5" />
-                <Text className="flex-1">
-                  Only share this address with trusted sources
-                </Text>
-              </View>
-              <View className="flex-row items-start gap-3">
-                <MaterialIcons name="verified" size={16} color={colors.primary} className="mt-0.5" />
-                <Text className="flex-1">
-                  Verify the address before sending large amounts
-                </Text>
-              </View>
-              <View className="flex-row items-start gap-3">
-                <MaterialIcons name="backup" size={16} color={colors.primary} className="mt-0.5" />
-                <Text className="flex-1">
-                  Keep your recovery phrase safe and secure
-                </Text>
-              </View>
-            </View>
+            <Text className="text-xs text-lapis-lazuli mt-2">
+              Share this address to receive cryptocurrencies
+            </Text>
           </View>
+
+          {/* Action Button */}
+          <Button 
+            variant="primary"
+            className="bg-lapis-lazuli mt-2"
+            onPress={copyToClipboard}
+          >
+            <Text className="text-white font-semibold">Copy Address</Text>
+          </Button>
         </View>
       </ScrollView>
     </SafeAreaView>

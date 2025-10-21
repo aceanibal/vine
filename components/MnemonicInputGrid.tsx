@@ -6,7 +6,6 @@ import { useMemo, useRef } from 'react';
 import { View, TextInput, TouchableOpacity } from 'react-native';
 
 import { Text } from '~/components/nativewindui/Text';
-import { useColorScheme } from '~/lib/useColorScheme';
 import { MaterialIcons } from '@expo/vector-icons';
 
 type MnemonicInputGridProps = {
@@ -16,7 +15,16 @@ type MnemonicInputGridProps = {
 };
 
 export function MnemonicInputGrid({ words, onChangeWords, onValidityChange }: MnemonicInputGridProps) {
-  const { colors } = useColorScheme();
+  // Lapis-lazuli theme colors
+  const colors = {
+    card: '#F3F4F6',
+    background: '#FFFFFF',
+    grey: '#6B7280',
+    foreground: '#225D7C',
+    primary: '#225D7C',
+    destructive: '#FC7E7E',
+    grey2: '#9CA3AF',
+  };
 
   const englishWords: string[] = useMemo(() => {
     try {
@@ -103,7 +111,24 @@ export function MnemonicInputGrid({ words, onChangeWords, onValidityChange }: Mn
 
   return (
     <View className="gap-4">
-      <Text className="text-center">Recovery Phrase</Text>
+      {/* Info Box */}
+      <View className="gap-3 rounded-xl bg-cambridge-blue/10 p-6">
+        <View className="items-center gap-2">
+          <MaterialIcons name="edit-note" size={28} color="#7FAFA1" />
+          <Text 
+            className="text-lapis-lazuli"
+            numberOfLines={1}
+            adjustsFontSizeToFit
+            style={{ fontSize: 20 }}
+          >
+            Enter Recovery Phrase
+          </Text>
+        </View>
+        <Text className="text-xs text-center text-lapis-lazuli">
+          Type each word. Suggestions from BIP-39 list will appear as you type.
+        </Text>
+      </View>
+
       <View className="-mx-1 flex-row flex-wrap">
         {Array.from({ length: 12 }).map((_, i) => {
           const value = words[i] || '';
@@ -112,39 +137,63 @@ export function MnemonicInputGrid({ words, onChangeWords, onValidityChange }: Mn
           return (
             <View key={i} className="w-1/2 px-1 py-1">
               <View className="gap-1">
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-xs text-muted-foreground">{i + 1}</Text>
-                  {value.length > 0 && (
-                    <MaterialIcons
-                      name={valid ? 'check-circle' : 'error'}
-                      size={14}
-                      color={valid ? colors.primary : colors.destructive}
+                <View className="flex-row items-center gap-2">
+                  <Text 
+                    className="text-sm font-semibold text-blue-green w-6"
+                    numberOfLines={1}
+                    adjustsFontSizeToFit
+                  >
+                    {i + 1}.
+                  </Text>
+                  <View className="flex-1 relative">
+                    <TextInput
+                      ref={(el) => {
+                        inputRefs.current[i] = el;
+                      }}
+                      className="h-10 rounded-lg border pr-8 pl-3 text-body"
+                      style={{
+                        borderColor: value.length > 0 
+                          ? (valid ? colors.primary : colors.destructive)
+                          : '#E5E7EB',
+                        backgroundColor: value.length > 0
+                          ? (valid ? 'rgba(34, 93, 124, 0.1)' : '#FEF2F2')
+                          : '#FFFFFF'
+                      }}
+                      placeholder={`Word ${i + 1}`}
+                      placeholderTextColor={colors.grey2}
+                      value={value}
+                      onChangeText={(t) => handleWordChange(i, t)}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      onSubmitEditing={() => handleWordSubmitEditing(i)}
+                      returnKeyType={i === 11 ? 'done' : 'next'}
                     />
-                  )}
+                    {value.length > 0 && (
+                      <View className="absolute right-2 top-3">
+                        <MaterialIcons
+                          name={valid ? 'check-circle' : 'error'}
+                          size={16}
+                          color={valid ? colors.primary : colors.destructive}
+                        />
+                      </View>
+                    )}
+                  </View>
                 </View>
-                <TextInput
-                  ref={(el) => {
-                    inputRefs.current[i] = el;
-                  }}
-                  className="h-10 rounded-lg border border-border bg-card px-3 text-body"
-                  placeholder={`Word ${i + 1}`}
-                  placeholderTextColor={colors.grey2}
-                  value={value}
-                  onChangeText={(t) => handleWordChange(i, t)}
-                  autoCapitalize="none"
-                  autoCorrect={false}
-                  onSubmitEditing={() => handleWordSubmitEditing(i)}
-                  returnKeyType={i === 11 ? 'done' : 'next'}
-                />
                 {suggestions.length > 0 && (
-                  <View className="flex-row flex-wrap gap-1">
+                  <View className="flex-row flex-wrap gap-1 ml-8">
                     {suggestions.map((s) => (
                       <TouchableOpacity
                         key={s}
                         onPress={() => handleSelectSuggestion(i, s)}
-                        className="rounded-full border border-border bg-muted px-2 py-1"
+                        className="rounded-full bg-lapis-lazuli/10 px-2 py-1"
                       >
-                        <Text className="text-[10px]">{s}</Text>
+                        <Text 
+                          className="text-[14px] text-black"
+                          numberOfLines={1}
+                          adjustsFontSizeToFit
+                        >
+                          {s}
+                        </Text>
                       </TouchableOpacity>
                     ))}
                   </View>
@@ -155,11 +204,14 @@ export function MnemonicInputGrid({ words, onChangeWords, onValidityChange }: Mn
         })}
       </View>
       <View className="flex-row items-center justify-between">
-        <Text className="text-xs text-muted-foreground">{wordCount}/12 words</Text>
+        <Text 
+          className="text-xs text-blue-green"
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        >
+          {wordCount}/12 words
+        </Text>
       </View>
-      <Text className="text-xs text-center text-muted-foreground">
-        Type each word. Suggestions are from the BIP-39 list; words are case-insensitive.
-      </Text>
     </View>
   );
 }

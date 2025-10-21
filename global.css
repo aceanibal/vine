@@ -2,6 +2,10 @@
 @tailwind components;
 @tailwind utilities;
 
+* {
+  font-family: -apple-system, BlinkMacSystemFont, 'San Francisco', 'Roboto', sans-serif;
+}
+
 @layer base {
   :root {
     --background: 242 242 247;

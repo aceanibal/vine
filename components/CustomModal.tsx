@@ -59,36 +59,54 @@ export function CustomModal({
   const getIconColor = () => {
     if (severity) {
       switch (severity) {
-        case 'critical': return '#EF4444';
-        case 'high': return '#F59E0B';
-        case 'medium': return '#3B82F6';
-        case 'low': return '#10B981';
-        default: return '#3B82F6';
+        case 'critical': return '#FC7E7E'; // boston-red
+        case 'high': return '#FC7E7E'; // boston-red
+        case 'medium': return '#7FAFA1'; // cambridge-blue
+        case 'low': return '#7FAFA1'; // cambridge-blue
+        default: return '#7FAFA1'; // cambridge-blue
       }
     }
     switch (type) {
-      case 'success': return '#10B981';
-      case 'error': return '#EF4444';
-      case 'warning': return '#F59E0B';
-      default: return '#3B82F6';
+      case 'success': return '#7FAFA1'; // cambridge-blue
+      case 'error': return '#FC7E7E'; // boston-red
+      case 'warning': return '#FC7E7E'; // boston-red
+      default: return '#7FAFA1'; // cambridge-blue
     }
   };
 
-  const getConfirmButtonClass = () => {
+  const getConfirmButtonColor = () => {
     if (severity) {
       switch (severity) {
-        case 'critical': return 'bg-red-500';
-        case 'high': return 'bg-amber-500';
-        case 'medium': return 'bg-blue-500';
-        case 'low': return 'bg-emerald-500';
-        default: return 'bg-blue-500';
+        case 'critical': return 'rgba(252, 126, 126, 0.1)'; // boston-red/10
+        case 'high': return 'rgba(252, 126, 126, 0.1)'; // boston-red/10
+        case 'medium': return 'rgba(127, 175, 161, 0.1)'; // cambridge-blue/10
+        case 'low': return 'rgba(127, 175, 161, 0.1)'; // cambridge-blue/10
+        default: return 'rgba(127, 175, 161, 0.1)'; // cambridge-blue/10
       }
     }
     switch (type) {
-      case 'success': return 'bg-emerald-500';
-      case 'error': return 'bg-red-500';
-      case 'warning': return 'bg-amber-500';
-      default: return 'bg-blue-500';
+      case 'success': return 'rgba(127, 175, 161, 0.1)'; // cambridge-blue/10
+      case 'error': return 'rgba(252, 126, 126, 0.1)'; // boston-red/10
+      case 'warning': return 'rgba(252, 126, 126, 0.1)'; // boston-red/10
+      default: return 'rgba(127, 175, 161, 0.1)'; // cambridge-blue/10
+    }
+  };
+
+  const getConfirmTextColor = () => {
+    if (severity) {
+      switch (severity) {
+        case 'critical': return '#FC7E7E'; // boston-red
+        case 'high': return '#FC7E7E'; // boston-red
+        case 'medium': return '#7FAFA1'; // cambridge-blue
+        case 'low': return '#7FAFA1'; // cambridge-blue
+        default: return '#7FAFA1'; // cambridge-blue
+      }
+    }
+    switch (type) {
+      case 'success': return '#7FAFA1'; // cambridge-blue
+      case 'error': return '#FC7E7E'; // boston-red
+      case 'warning': return '#FC7E7E'; // boston-red
+      default: return '#7FAFA1'; // cambridge-blue
     }
   };
 
@@ -101,26 +119,27 @@ export function CustomModal({
     >
       <View className="flex-1 bg-black/50 justify-center items-center p-5">
         <View 
-          className="w-full max-w-md rounded-xl p-6 shadow-lg" 
-          style={{ backgroundColor: colors.card }}
+          className="w-full max-w-md rounded-xl p-6 shadow-lg bg-white" 
         >
-          <View className="flex-row items-center mb-4">
+          <View className="items-center gap-3 mb-4">
             <MaterialIcons 
               name={getIconName()} 
-              size={24} 
+              size={48} 
               color={getIconColor()} 
             />
             <Text 
-              className="text-lg font-semibold ml-3" 
-              style={{ color: colors.foreground }}
+              className="text-lapis-lazuli font-semibold text-center" 
+              numberOfLines={2}
+              adjustsFontSizeToFit
+              style={{ fontSize: 20 }}
             >
               {title}
             </Text>
           </View>
           
           <Text 
-            className="text-base leading-6 mb-6" 
-            style={{ color: colors.grey }}
+            className="text-lapis-lazuli text-center mb-6" 
+            style={{ fontSize: 15, lineHeight: 22 }}
           >
             {message}
           </Text>
@@ -128,12 +147,15 @@ export function CustomModal({
           <View className="flex-row justify-end gap-3">
             {(secondaryAction || onCancel || (showCancel && onClose)) && (
               <TouchableOpacity
-                className="px-5 py-3 rounded-lg min-w-20 items-center bg-transparent"
+                className="flex-1 py-3 rounded-lg items-center"
+                style={{ backgroundColor: 'rgba(34, 93, 124, 0.1)' }}
                 onPress={secondaryAction?.action || onCancel || onClose}
               >
                 <Text 
-                  className="text-base font-medium" 
-                  style={{ color: colors.grey }}
+                  className="font-semibold text-lapis-lazuli" 
+                  style={{ fontSize: 16 }}
+                  numberOfLines={1}
+                  adjustsFontSizeToFit
                 >
                   {secondaryAction?.label || 'Cancel'}
                 </Text>
@@ -141,10 +163,16 @@ export function CustomModal({
             )}
             
             <TouchableOpacity
-              className={`px-5 py-3 rounded-lg min-w-20 items-center ${getConfirmButtonClass()}`}
+              className="flex-1 py-3 rounded-lg items-center"
+              style={{ backgroundColor: getConfirmButtonColor() }}
               onPress={primaryAction?.action || onConfirm}
             >
-              <Text className="text-base font-medium text-white">
+              <Text 
+                className="font-semibold" 
+                style={{ fontSize: 16, color: getConfirmTextColor() }}
+                numberOfLines={1}
+                adjustsFontSizeToFit
+              >
                 {primaryAction?.label || 'Confirm'}
               </Text>
             </TouchableOpacity>

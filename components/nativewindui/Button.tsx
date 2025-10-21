@@ -1,7 +1,8 @@
 import * as Slot from '@rn-primitives/slot';
 import { cva, type VariantProps } from 'class-variance-authority';
 import * as React from 'react';
-import { Platform, Pressable, PressableProps, View, ViewStyle } from 'react-native';
+import { Platform, Pressable, PressableProps, PressableStateCallbackType, View, ViewStyle } from 'react-native';
+import * as Haptics from 'expo-haptics';
 
 import { TextClassContext } from '~/components/nativewindui/Text';
 import { cn } from '~/lib/cn';
@@ -16,6 +17,7 @@ const buttonVariants = cva('flex-row items-center justify-center gap-2', {
       tonal:
         'ios:bg-primary/10 dark:ios:bg-primary/10 ios:active:bg-primary/15 bg-primary/15 dark:bg-primary/30',
       plain: 'ios:active:opacity-70',
+      lapis: 'border border-lapis-lazuli shadow-lg shadow-lapis-lazuli',
     },
     size: {
       none: '',
@@ -53,6 +55,7 @@ const buttonTextVariants = cva('font-medium', {
       secondary: 'ios:text-primary text-foreground',
       tonal: 'ios:text-primary text-foreground',
       plain: 'text-foreground',
+      lapis: 'text-lapis-lazuli',
     },
     size: {
       none: '',
@@ -88,12 +91,14 @@ const ANDROID_RIPPLE = {
     secondary: { color: convertToRGBA(COLORS.dark.grey5, 0.8), borderless: false },
     plain: { color: convertToRGBA(COLORS.dark.grey5, 0.8), borderless: false },
     tonal: { color: convertToRGBA(COLORS.dark.grey5, 0.8), borderless: false },
+    lapis: { color: '#225D7C', borderless: false },
   },
   light: {
     primary: { color: convertToRGBA(COLORS.light.grey4, 0.4), borderless: false },
     secondary: { color: convertToRGBA(COLORS.light.grey5, 0.4), borderless: false },
     plain: { color: convertToRGBA(COLORS.light.grey5, 0.4), borderless: false },
     tonal: { color: convertToRGBA(COLORS.light.grey6, 0.4), borderless: false },
+    lapis: { color: '#225D7C', borderless: false },
   },
 };
 
@@ -119,10 +124,63 @@ const Root = Platform.OS === 'android' ? View : Slot.Pressable;
 
 const Button = React.forwardRef<React.ElementRef<typeof Pressable>, ButtonProps>(
   (
-    { className, variant = 'primary', size, style = BORDER_CURVE, androidRootClassName, ...props },
+    { className, variant = 'primary', size, style = BORDER_CURVE, androidRootClassName, onPress, children, ...props },
     ref
   ) => {
     const { colorScheme } = useColorScheme();
+
+    const handlePress = React.useCallback((event: any) => {
+      if (variant === 'lapis') {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      }
+      onPress?.(event);
+    }, [variant, onPress]);
+
+    // For lapis variant, we need to use children as a function to access pressed state
+    if (variant === 'lapis') {
+      return (
+        <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
+          <Root
+            className={Platform.select({
+              ios: undefined,
+              default: androidRootVariants({
+                size,
+                className: androidRootClassName,
+              }),
+            })}>
+            <Pressable
+              className={cn(
+                props.disabled && 'opacity-50',
+                'flex-row items-center justify-center gap-2'
+              )}
+              ref={ref}
+              style={style}
+              android_ripple={ANDROID_RIPPLE[colorScheme][variant]}
+              onPress={handlePress}
+              {...props}
+            >
+              {(state: PressableStateCallbackType) => (
+                <View
+                  className={cn(
+                    buttonVariants({ variant, size, className })
+                  )}
+                  style={{
+                    shadowColor: '#225D7C',
+                    shadowOffset: { width: 0, height: 2 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 3.84,
+                    elevation: 5,
+                    backgroundColor: state.pressed ? '#225D7C' : 'transparent',
+                  }}
+                >
+                  {typeof children === 'function' ? children(state) : children}
+                </View>
+              )}
+            </Pressable>
+          </Root>
+        </TextClassContext.Provider>
+      );
+    }
 
     return (
       <TextClassContext.Provider value={buttonTextVariants({ variant, size })}>
@@ -142,8 +200,11 @@ const Button = React.forwardRef<React.ElementRef<typeof Pressable>, ButtonProps>
             ref={ref}
             style={style}
             android_ripple={ANDROID_RIPPLE[colorScheme][variant]}
+            onPress={onPress}
             {...props}
-          />
+          >
+            {children}
+          </Pressable>
         </Root>
       </TextClassContext.Provider>
     );
