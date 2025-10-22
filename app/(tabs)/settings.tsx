@@ -153,7 +153,7 @@ export default function SettingsScreen() {
     <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
       <ScrollView className="flex-1 mt-6" contentContainerStyle={{ flexGrow: 1 }}>
         <View className="flex-1 rounded-t-3xl bg-white p-6">
-        <View className="gap-8">
+          <View className="gap-8">
 
           {/* Wallet Section */}
           <View className="gap-4">
@@ -322,13 +322,17 @@ export default function SettingsScreen() {
                     </Text>
                   </View>
                 </View>
+              </View>
+              
+              {/* Authorization Buttons */}
+              <View className="px-6">
                 {/* Authorize (only when not authorized) */}
                 {!isWalletAuthorized && (
                   <Button
                     mode="contained"
-                    buttonColor="#225D7C"
+                    buttonColor={isAuthorizing || isStoreLoading ? "rgba(34, 93, 124, 0.1)" : "#225D7C"}
                     onPress={async () => {
-                      if (!currentWallet?.address) return;
+                      if (!currentWallet?.address || isAuthorizing || isStoreLoading) return;
                       setIsAuthorizing(true);
                       try {
                         console.log('[Settings] Starting authorization...');
@@ -348,18 +352,29 @@ export default function SettingsScreen() {
                         setIsAuthorizing(false);
                       }
                     }}
-                    disabled={isAuthorizing || isStoreLoading}
-                    style={{ width: '100%' }}
+                    style={{ 
+                      width: '100%',
+                      backgroundColor: isAuthorizing || isStoreLoading ? 'rgba(34, 93, 124, 0.1)' : '#225D7C',
+                      opacity: 1
+                    }}
                     contentStyle={{ flexDirection: 'row-reverse', paddingVertical: 8 }}
+                    theme={{
+                      colors: {
+                        primary: isAuthorizing || isStoreLoading ? 'rgba(34, 93, 124, 0.1)' : '#225D7C',
+                        onPrimary: isAuthorizing || isStoreLoading ? '#225D7C' : '#FFFFFF',
+                        surface: isAuthorizing || isStoreLoading ? 'rgba(34, 93, 124, 0.1)' : '#225D7C',
+                        onSurface: isAuthorizing || isStoreLoading ? '#225D7C' : '#FFFFFF'
+                      }
+                    }}
                   >
-                    <Text className="text-white" numberOfLines={1} adjustsFontSizeToFit>{isAuthorizing ? 'Authorizing...' : 'Authorize Wallet'}</Text>
+                    <Text className={`font-semibold`} style={{ fontSize: 18, color: isAuthorizing || isStoreLoading ? '#225D7C' : '#FFFFFF' }} numberOfLines={1} adjustsFontSizeToFit>{isAuthorizing ? 'Authorizing...' : 'Authorize Wallet'}</Text>
                   </Button>
                 )}
-                {/* Revoke Authorization moved below details (only when authorized) */}
+                {/* Revoke Authorization (only when authorized) */}
                 {isWalletAuthorized && (
                   <Button
                     mode="contained"
-                    buttonColor="#225D7C"
+                    buttonColor="rgba(217, 168, 72, 0.1)"
                     onPress={async () => {
                       if (!currentWallet?.address) return;
                       setIsRevoking(true);
@@ -383,13 +398,26 @@ export default function SettingsScreen() {
                       }
                     }}
                     disabled={isRevoking}
-                    style={{ width: '100%' }}
+                    style={{ 
+                      width: '100%',
+                      backgroundColor: 'rgba(217, 168, 72, 0.1)',
+                      opacity: isRevoking ? 0.5 : 1
+                    }}
                     contentStyle={{ flexDirection: 'row-reverse', paddingVertical: 8 }}
+                    theme={{
+                      colors: {
+                        primary: 'rgba(217, 168, 72, 0.1)',
+                        onPrimary: '#D9A848',
+                        surface: 'rgba(217, 168, 72, 0.1)',
+                        onSurface: '#D9A848'
+                      }
+                    }}
                   >
-                    <Text className="text-white" numberOfLines={1} adjustsFontSizeToFit>{isRevoking ? 'Revoking...' : 'Revoke Authorization'}</Text>
+                    <Text className="text-hunyadi-yellow font-semibold" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 18 }}>{isRevoking ? 'Revoking...' : 'Revoke Authorization'}</Text>
                   </Button>
                 )}
               </View>
+
             </View>
           </View>
 
@@ -397,12 +425,10 @@ export default function SettingsScreen() {
 
           {/* Delete Wallet Section - only show if wallet exists */}
           {walletAddress && (
-            <View className="gap-4 mt-auto pt-8">
-              <View className="gap-3 rounded-xl bg-cambridge-blue/10 p-6">
-                <View className="items-center gap-2">
-                  <MaterialIcons name="warning" size={28} color="#225D7C" />
+            <View className="gap-4 mt-auto pt-4">
+              <View className="gap-3 rounded-xl p-6">
 
-                </View>
+               
                 <Text className="text-xs text-center text-lapis-lazuli">
                   This will permanently delete your wallet address and private keys from this device. Make sure you have backed up your recovery phrase before proceeding.
                 </Text>
