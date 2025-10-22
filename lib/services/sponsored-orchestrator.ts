@@ -1,4 +1,5 @@
 import { ethers, Contract, JsonRpcProvider, Interface } from 'ethers';
+import { authorizationTracker } from './authorization-tracker';
 
 // Functional orchestrator API that reads config and secrets from the global store
 
@@ -81,46 +82,84 @@ export async function approveAuthorizationWithTracking(address: string): Promise
   const ok = await verifyDelegationContract(address);
   if (!ok) throw new Error('Delegation contract verification failed');
 
-  const currentNonce = await provider.getTransactionCount(wallet.address);
-  const authorization = await wallet.authorize({
-    address: config.delegationAddress,
-    nonce: currentNonce,
-    chainId: config.chainId,
-  });
+  // Start tracking the authorization transaction
+  authorizationTracker.startAuthorization(address, config.delegationAddress);
 
-  let normalizedAuth: any = { ...authorization };
-  const sigValue: any = (authorization as any).signature;
   try {
-    if (typeof sigValue === 'string') {
-      const parsed = ethers.Signature.from(sigValue);
-      normalizedAuth.signature = { r: parsed.r, s: parsed.s, v: parsed.v };
-    } else if (sigValue && typeof sigValue === 'object' && (!sigValue.r || !sigValue.s || sigValue.v === undefined)) {
-      const maybeHex = (sigValue as any).serialized || (sigValue as any).hex;
-      if (maybeHex && typeof maybeHex === 'string') {
-        const parsed = ethers.Signature.from(maybeHex);
+    const currentNonce = await provider.getTransactionCount(wallet.address);
+    const authorization = await wallet.authorize({
+      address: config.delegationAddress,
+      nonce: currentNonce,
+      chainId: config.chainId,
+    });
+
+    let normalizedAuth: any = { ...authorization };
+    const sigValue: any = (authorization as any).signature;
+    try {
+      if (typeof sigValue === 'string') {
+        const parsed = ethers.Signature.from(sigValue);
         normalizedAuth.signature = { r: parsed.r, s: parsed.s, v: parsed.v };
+      } else if (sigValue && typeof sigValue === 'object' && (!sigValue.r || !sigValue.s || sigValue.v === undefined)) {
+        const maybeHex = (sigValue as any).serialized || (sigValue as any).hex;
+        if (maybeHex && typeof maybeHex === 'string') {
+          const parsed = ethers.Signature.from(maybeHex);
+          normalizedAuth.signature = { r: parsed.r, s: parsed.s, v: parsed.v };
+        }
+      } else if (sigValue && typeof sigValue === 'object' && sigValue.r && sigValue.s && (sigValue.v !== undefined || sigValue.yParity !== undefined)) {
+        normalizedAuth.signature = { r: sigValue.r, s: sigValue.s, v: sigValue.v ?? sigValue.yParity };
       }
-    } else if (sigValue && typeof sigValue === 'object' && sigValue.r && sigValue.s && (sigValue.v !== undefined || sigValue.yParity !== undefined)) {
-      normalizedAuth.signature = { r: sigValue.r, s: sigValue.s, v: sigValue.v ?? sigValue.yParity };
+    } catch (_e) {}
+
+    const payload = {
+      type: 4,
+      to: wallet.address,
+      value: 0,
+      data: '0x',
+      gasLimit: 120000,
+      authorizationList: [normalizedAuth],
+    } as const;
+
+    const delegationTxHash = await sendToRelayer(payload, 'Delegation Setup', config);
+    console.log(`[SponsoredOrchestrator] Authorization transaction sent: ${delegationTxHash}`);
+    
+    // Update tracker with transaction hash
+    authorizationTracker.setTransactionHash(delegationTxHash);
+    
+    const mined = await monitorTransaction(delegationTxHash, 'Delegation', config);
+    if (!mined) {
+      console.log(`[SponsoredOrchestrator] Authorization transaction failed to mine: ${delegationTxHash}`);
+      authorizationTracker.failAuthorization('Transaction failed to mine');
+      return { success: false, delegationTxHash };
     }
-  } catch (_e) {}
-
-  const payload = {
-    type: 4,
-    to: wallet.address,
-    value: 0,
-    data: '0x',
-    gasLimit: 120000,
-    authorizationList: [normalizedAuth],
-  } as const;
-
-  const delegationTxHash = await sendToRelayer(payload, 'Delegation Setup', config);
-  const mined = await monitorTransaction(delegationTxHash, 'Delegation', config);
-  if (!mined) return { success: false, delegationTxHash };
-  await new Promise((r) => setTimeout(r, 3000));
-  const status = await checkDelegationStatus(wallet.address);
-  const success = !!(status.isDelegated && status.matchesTarget);
-  return { success, delegationTxHash };
+    
+    console.log(`[SponsoredOrchestrator] Authorization transaction mined: ${delegationTxHash}`);
+    authorizationTracker.setTransactionMined();
+    
+    await new Promise((r) => setTimeout(r, 3000));
+    
+    authorizationTracker.setCheckingDelegation();
+    const status = await checkDelegationStatus(wallet.address);
+    const success = !!(status.isDelegated && status.matchesTarget);
+    
+    console.log(`[SponsoredOrchestrator] Authorization result:`, {
+      success,
+      delegationTxHash,
+      status,
+      address: wallet.address
+    });
+    
+    if (success) {
+      authorizationTracker.completeAuthorization();
+    } else {
+      authorizationTracker.failAuthorization('Delegation status verification failed');
+    }
+    
+    return { success, delegationTxHash };
+  } catch (error) {
+    console.error(`[SponsoredOrchestrator] Authorization error:`, error);
+    authorizationTracker.failAuthorization(error instanceof Error ? error.message : 'Unknown error');
+    throw error;
+  }
 }
 
 export async function revokeAuthorizationWithTracking(address: string): Promise<{ success: boolean; revokeTxHash: string; }>{
@@ -130,46 +169,84 @@ export async function revokeAuthorizationWithTracking(address: string): Promise<
   const ok = await verifyDelegationContract(address);
   if (!ok) throw new Error('Delegation contract verification failed');
 
-  const currentNonce = await provider.getTransactionCount(wallet.address);
-  const revocation = await wallet.authorize({
-    address: '0x0000000000000000000000000000000000000000',
-    nonce: currentNonce,
-    chainId: config.chainId,
-  } as any);
+  // Start tracking the revocation transaction
+  authorizationTracker.startRevocation(address, config.delegationAddress);
 
-  let normalizedAuth: any = { ...revocation };
-  const sigValue: any = (revocation as any).signature;
   try {
-    if (typeof sigValue === 'string') {
-      const parsed = ethers.Signature.from(sigValue);
-      normalizedAuth.signature = { r: parsed.r, s: parsed.s, v: parsed.v };
-    } else if (sigValue && typeof sigValue === 'object' && (!sigValue.r || !sigValue.s || sigValue.v === undefined)) {
-      const maybeHex = (sigValue as any).serialized || (sigValue as any).hex;
-      if (maybeHex && typeof maybeHex === 'string') {
-        const parsed = ethers.Signature.from(maybeHex);
+    const currentNonce = await provider.getTransactionCount(wallet.address);
+    const revocation = await wallet.authorize({
+      address: '0x0000000000000000000000000000000000000000',
+      nonce: currentNonce,
+      chainId: config.chainId,
+    } as any);
+
+    let normalizedAuth: any = { ...revocation };
+    const sigValue: any = (revocation as any).signature;
+    try {
+      if (typeof sigValue === 'string') {
+        const parsed = ethers.Signature.from(sigValue);
         normalizedAuth.signature = { r: parsed.r, s: parsed.s, v: parsed.v };
+      } else if (sigValue && typeof sigValue === 'object' && (!sigValue.r || !sigValue.s || sigValue.v === undefined)) {
+        const maybeHex = (sigValue as any).serialized || (sigValue as any).hex;
+        if (maybeHex && typeof maybeHex === 'string') {
+          const parsed = ethers.Signature.from(maybeHex);
+          normalizedAuth.signature = { r: parsed.r, s: parsed.s, v: parsed.v };
+        }
+      } else if (sigValue && typeof sigValue === 'object' && sigValue.r && sigValue.s && (sigValue.v !== undefined || sigValue.yParity !== undefined)) {
+        normalizedAuth.signature = { r: sigValue.r, s: sigValue.s, v: sigValue.v ?? sigValue.yParity };
       }
-    } else if (sigValue && typeof sigValue === 'object' && sigValue.r && sigValue.s && (sigValue.v !== undefined || sigValue.yParity !== undefined)) {
-      normalizedAuth.signature = { r: sigValue.r, s: sigValue.s, v: sigValue.v ?? sigValue.yParity };
+    } catch (_e) {}
+
+    const payload = {
+      type: 4,
+      to: wallet.address,
+      value: 0,
+      data: '0x',
+      gasLimit: 120000,
+      authorizationList: [normalizedAuth],
+    } as const;
+
+    const revokeTxHash = await sendToRelayer(payload, 'Delegation Revoke', config);
+    console.log(`[SponsoredOrchestrator] Revocation transaction sent: ${revokeTxHash}`);
+    
+    // Update tracker with transaction hash
+    authorizationTracker.setTransactionHash(revokeTxHash);
+    
+    const mined = await monitorTransaction(revokeTxHash, 'Delegation Revoke', config);
+    if (!mined) {
+      console.log(`[SponsoredOrchestrator] Revocation transaction failed to mine: ${revokeTxHash}`);
+      authorizationTracker.failRevocation('Transaction failed to mine');
+      return { success: false, revokeTxHash };
     }
-  } catch (_e) {}
-
-  const payload = {
-    type: 4,
-    to: wallet.address,
-    value: 0,
-    data: '0x',
-    gasLimit: 120000,
-    authorizationList: [normalizedAuth],
-  } as const;
-
-  const revokeTxHash = await sendToRelayer(payload, 'Delegation Revoke', config);
-  const mined = await monitorTransaction(revokeTxHash, 'Delegation Revoke', config);
-  if (!mined) return { success: false, revokeTxHash };
-  await new Promise((r) => setTimeout(r, 3000));
-  const status = await checkDelegationStatus(wallet.address);
-  const success = !status.isDelegated || !status.matchesTarget;
-  return { success, revokeTxHash };
+    
+    console.log(`[SponsoredOrchestrator] Revocation transaction mined: ${revokeTxHash}`);
+    authorizationTracker.setTransactionMined();
+    
+    await new Promise((r) => setTimeout(r, 3000));
+    
+    authorizationTracker.setCheckingDelegation();
+    const status = await checkDelegationStatus(wallet.address);
+    const success = !status.isDelegated || !status.matchesTarget;
+    
+    console.log(`[SponsoredOrchestrator] Revocation result:`, {
+      success,
+      revokeTxHash,
+      status,
+      address: wallet.address
+    });
+    
+    if (success) {
+      authorizationTracker.completeRevocation();
+    } else {
+      authorizationTracker.failRevocation('Delegation status verification failed');
+    }
+    
+    return { success, revokeTxHash };
+  } catch (error) {
+    console.error(`[SponsoredOrchestrator] Revocation error:`, error);
+    authorizationTracker.failRevocation(error instanceof Error ? error.message : 'Unknown error');
+    throw error;
+  }
 }
 
 export async function executeSponsoredTransfer(params: { fromAddress: string; tokenAddress: string; toAddress: string; amount: string; }): Promise<{ success: boolean; transferTxHash: string; }>{

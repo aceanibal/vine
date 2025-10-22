@@ -23,15 +23,31 @@ export function PriceChart({ data, height = 100 }: PriceChartProps) {
     price: point.price,
   }));
 
+  // Calculate min/max prices and add 10% padding
+  const prices = chartData.map(d => d.price);
+  const minPrice = Math.min(...prices);
+  const maxPrice = Math.max(...prices);
+  const priceRange = maxPrice - minPrice;
+  const padding = priceRange * 0.1;
+  const yMin = minPrice - padding;
+  const yMax = maxPrice + padding;
+
   return (
-    <View style={{ height, width: '100%' }}>
+    <View style={{ 
+      height, 
+      width: '100%', 
+      borderRadius: 12,
+      overflow: 'hidden'
+    }} 
+    className="rounded-xl bg-blue-green/2">
       <CartesianChart
         data={chartData}
         xKey="timestamp"
         yKeys={["price"]}
+        domain={{ y: [yMin, yMax] }}
         axisOptions={{
           font: undefined,
-          tickCount: 5,
+          tickCount: 0,
           labelColor: colors.grey3,
           lineColor: '#A8CFB7',
           formatXLabel: () => '',

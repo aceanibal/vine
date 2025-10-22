@@ -105,6 +105,38 @@ export default function SettingsScreen() {
     setShowModal(true);
   };
 
+  const handleRevokeAuthorization = () => {
+    setModalConfig({
+      title: 'Revoke Authorization',
+      message: 'Are you sure you want to revoke your wallet authorization? This will prevent us from sponsoring your gas fees for future transactions.',
+      type: 'warning',
+      onConfirm: async () => {
+        setShowModal(false); // Close modal immediately
+        if (!currentWallet?.address) return;
+        setIsRevoking(true);
+        try {
+          console.log('[Settings] Revoke pressed');
+          const res = await revokeAuthorizationWithTracking(currentWallet.address);
+          console.log('[Settings] Revoke result:', res);
+          // Use single source of truth to update status
+          await checkWalletAuthorization();
+          setToastConfig({
+            message: res.success ? `Authorization revoked${res.revokeTxHash ? ` (tx: ${res.revokeTxHash.slice(0,10)}...${res.revokeTxHash.slice(-8)})` : ''}` : 'Failed to revoke authorization',
+            type: res.success ? 'success' : 'error',
+          });
+          setShowToast(true);
+        } catch (e: any) {
+          console.log('[Settings] Revoke error:', e);
+          setToastConfig({ message: e?.message || 'Revocation failed', type: 'error' });
+          setShowToast(true);
+        } finally {
+          setIsRevoking(false);
+        }
+      }
+    });
+    setShowModal(true);
+  };
+
   const handleViewRecoveryPhrase = async () => {
     console.log('View recovery phrase button pressed');
     try {
@@ -240,7 +272,7 @@ export default function SettingsScreen() {
 
           {/* Authorization Section */}
           <View className="gap-4">
-            <View className="flex-row items-center justify-between mb-2">
+            <View className="flex-row items-center justify-between">
               <Text className="text-xl font-bold text-lapis-lazuli/80">Authorization</Text>
               <TouchableOpacity 
                 onPress={async () => {
@@ -322,103 +354,94 @@ export default function SettingsScreen() {
                     </Text>
                   </View>
                 </View>
-              </View>
-              
-              {/* Authorization Buttons */}
-              <View className="px-6">
-                {/* Authorize (only when not authorized) */}
-                {!isWalletAuthorized && (
-                  <Button
-                    mode="contained"
-                    buttonColor={isAuthorizing || isStoreLoading ? "rgba(34, 93, 124, 0.1)" : "#225D7C"}
-                    onPress={async () => {
-                      if (!currentWallet?.address || isAuthorizing || isStoreLoading) return;
-                      setIsAuthorizing(true);
-                      try {
-                        console.log('[Settings] Starting authorization...');
-                        const res = await approveAuthorizationWithTracking(currentWallet.address);
-                        // Use single source of truth to update status
-                        await checkWalletAuthorization();
-                        setToastConfig({
-                          message: res.success ? 'Authorization successful' : 'Authorization failed',
-                          type: res.success ? 'success' : 'error',
-                        });
-                        setShowToast(true);
-                      } catch (e: any) {
-                        console.error('[Settings] Authorization error:', e);
-                        setToastConfig({ message: e?.message || 'Authorization failed', type: 'error' });
-                        setShowToast(true);
-                      } finally {
-                        setIsAuthorizing(false);
-                      }
-                    }}
-                    style={{ 
-                      width: '100%',
-                      backgroundColor: isAuthorizing || isStoreLoading ? 'rgba(34, 93, 124, 0.1)' : '#225D7C',
-                      opacity: 1
-                    }}
-                    contentStyle={{ flexDirection: 'row-reverse', paddingVertical: 8 }}
-                    theme={{
-                      colors: {
-                        primary: isAuthorizing || isStoreLoading ? 'rgba(34, 93, 124, 0.1)' : '#225D7C',
-                        onPrimary: isAuthorizing || isStoreLoading ? '#225D7C' : '#FFFFFF',
-                        surface: isAuthorizing || isStoreLoading ? 'rgba(34, 93, 124, 0.1)' : '#225D7C',
-                        onSurface: isAuthorizing || isStoreLoading ? '#225D7C' : '#FFFFFF'
-                      }
-                    }}
-                  >
-                    <Text className={`font-semibold`} style={{ fontSize: 18, color: isAuthorizing || isStoreLoading ? '#225D7C' : '#FFFFFF' }} numberOfLines={1} adjustsFontSizeToFit>{isAuthorizing ? 'Authorizing...' : 'Authorize Wallet'}</Text>
-                  </Button>
-                )}
-                {/* Revoke Authorization (only when authorized) */}
-                {isWalletAuthorized && (
-                  <Button
-                    mode="contained"
-                    buttonColor="rgba(217, 168, 72, 0.1)"
-                    onPress={async () => {
-                      if (!currentWallet?.address) return;
-                      setIsRevoking(true);
-                      try {
-                        console.log('[Settings] Revoke pressed');
-                        const res = await revokeAuthorizationWithTracking(currentWallet.address);
-                        console.log('[Settings] Revoke result:', res);
-                        // Use single source of truth to update status
-                        await checkWalletAuthorization();
-                        setToastConfig({
-                          message: res.success ? `Authorization revoked${res.revokeTxHash ? ` (tx: ${res.revokeTxHash.slice(0,10)}...${res.revokeTxHash.slice(-8)})` : ''}` : 'Failed to revoke authorization',
-                          type: res.success ? 'success' : 'error',
-                        });
-                        setShowToast(true);
-                      } catch (e: any) {
-                        console.log('[Settings] Revoke error:', e);
-                        setToastConfig({ message: e?.message || 'Revocation failed', type: 'error' });
-                        setShowToast(true);
-                      } finally {
-                        setIsRevoking(false);
-                      }
-                    }}
-                    disabled={isRevoking}
-                    style={{ 
-                      width: '100%',
-                      backgroundColor: 'rgba(217, 168, 72, 0.1)',
-                      opacity: isRevoking ? 0.5 : 1
-                    }}
-                    contentStyle={{ flexDirection: 'row-reverse', paddingVertical: 8 }}
-                    theme={{
-                      colors: {
-                        primary: 'rgba(217, 168, 72, 0.1)',
-                        onPrimary: '#D9A848',
-                        surface: 'rgba(217, 168, 72, 0.1)',
-                        onSurface: '#D9A848'
-                      }
-                    }}
-                  >
-                    <Text className="text-hunyadi-yellow font-semibold" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 18 }}>{isRevoking ? 'Revoking...' : 'Revoke Authorization'}</Text>
-                  </Button>
-                )}
+                
               </View>
 
             </View>
+          </View>
+
+          {/* Authorization Actions Section */}
+          <View className="gap-2 rounded-xl px-6">
+            {/* Authorize (only when not authorized) */}
+            {!isWalletAuthorized && (
+              <>
+                <Text className="text-xs text-center text-lapis-lazuli">
+                  Authorize your wallet to enable sponsored gas fees for transactions.
+                </Text>
+                <Button
+                  mode="contained"
+                  buttonColor={isAuthorizing || isStoreLoading ? "rgba(34, 93, 124, 0.1)" : "#225D7C"}
+                  onPress={async () => {
+                    if (!currentWallet?.address || isAuthorizing || isStoreLoading) return;
+                    setIsAuthorizing(true);
+                    try {
+                      console.log('[Settings] Starting authorization...');
+                      const res = await approveAuthorizationWithTracking(currentWallet.address);
+                      // Use single source of truth to update status
+                      await checkWalletAuthorization();
+                      setToastConfig({
+                        message: res.success ? `Authorization successful${res.delegationTxHash ? ` (tx: ${res.delegationTxHash.slice(0,10)}...${res.delegationTxHash.slice(-8)})` : ''}` : 'Authorization failed',
+                        type: res.success ? 'success' : 'error',
+                      });
+                      setShowToast(true);
+                    } catch (e: any) {
+                      console.error('[Settings] Authorization error:', e);
+                      setToastConfig({ message: e?.message || 'Authorization failed', type: 'error' });
+                      setShowToast(true);
+                    } finally {
+                      setIsAuthorizing(false);
+                    }
+                  }}
+                  style={{ 
+                    width: '100%',
+                    backgroundColor: isAuthorizing || isStoreLoading ? 'rgba(34, 93, 124, 0.1)' : '#225D7C',
+                    opacity: 1
+                  }}
+                  contentStyle={{ flexDirection: 'row-reverse', paddingVertical: 8 }}
+                  theme={{
+                    colors: {
+                      primary: isAuthorizing || isStoreLoading ? 'rgba(34, 93, 124, 0.1)' : '#225D7C',
+                      onPrimary: isAuthorizing || isStoreLoading ? '#225D7C' : '#FFFFFF',
+                      surface: isAuthorizing || isStoreLoading ? 'rgba(34, 93, 124, 0.1)' : '#225D7C',
+                      onSurface: isAuthorizing || isStoreLoading ? '#225D7C' : '#FFFFFF'
+                    }
+                  }}
+                >
+                  <Text className={`font-semibold`} style={{ fontSize: 18, color: isAuthorizing || isStoreLoading ? '#225D7C' : '#FFFFFF' }} numberOfLines={1} adjustsFontSizeToFit>{isAuthorizing ? 'Authorizing...' : 'Authorize Wallet'}</Text>
+                </Button>
+              </>
+            )}
+            
+            {/* Revoke Authorization (only when authorized) */}
+            {isWalletAuthorized && (
+              <>
+                <Text className="text-xs text-center text-lapis-lazuli">
+                  This will revoke your wallet authorization and prevent us from sponsoring your gas fees for future transactions.
+                </Text>
+                <Button 
+                  mode="contained"
+                  buttonColor="rgba(252, 126, 126, 0.1)"
+                  onPress={handleRevokeAuthorization}
+                  disabled={isRevoking}
+                  style={{ 
+                    width: '100%',
+                    backgroundColor: 'rgba(252, 126, 126, 0.1)',
+                    opacity: isRevoking ? 0.5 : 1
+                  }}
+                  contentStyle={{ flexDirection: 'row-reverse', paddingVertical: 8 }}
+                  theme={{
+                    colors: {
+                      primary: 'rgba(252, 126, 126, 0.1)',
+                      onPrimary: '#FC7E7E',
+                      surface: 'rgba(252, 126, 126, 0.1)',
+                      onSurface: '#FC7E7E'
+                    }
+                  }}
+                >
+                  <Text className="text-boston-red font-semibold" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 18 }}>{isRevoking ? 'Revoking...' : 'Revoke Authorization'}</Text>
+                </Button>
+              </>
+            )}
           </View>
 
           {/* Active Chains Section - removed in XRBG branch */}

@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { View, ScrollView, TouchableOpacity, RefreshControl, Modal } from 'react-native';
+import { View, ScrollView, TouchableOpacity, RefreshControl, Modal, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
@@ -266,36 +266,45 @@ export default function DashboardScreen() {
                 </Text>
               </View>
               <TouchableOpacity 
-                className="rounded-full p-3 ml-4"
+                className="rounded-full p-2 ml-4"
                 onPress={() => {
                   setShowReceiveModal(true);
                 }}
               >
-                <MaterialIcons name="qr-code-2" size={40} color="#7FAFA1" />
+                <MaterialIcons name="qr-code-2" size={30} color="#225D7C" />
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Gold Info */}
           {predefinedToken ? (
-            <View className="gap-3 rounded-xl bg-cambridge-blue/10 p-5 mx-6 mb-3">
-              <View>
-                <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 20, minHeight: 26 }}>Gold Balance</Text>
-                <Text className="font-semibold mt-1 text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15 }}>
-                  {tokenData.balance} grams
-                </Text>
+            <View className="gap-1 rounded-xl bg-lapis-lazuli/5 p-2 mx-5 mb-3">
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1">
+                  <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 20, minHeight: 26 }}>Gold Balance</Text>
+                  <Text className="font-semibold mt-1 text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15 }}>
+                    {tokenData.balance} grams
+                  </Text>
+                </View>
+                <Image 
+                  source={require('~/assets/xrb-gold-logo-icon.png')} 
+                  style={{ width: 40, height: 40, opacity: 0.6 }} 
+                  resizeMode="contain"
+                />
               </View>
               
-              <View>
-                <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 20, minHeight: 26 }}>Gold Price</Text>
-                <Text className="font-semibold mt-1 text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15 }}>
-                  {formatCurrency(tokenData.price)} per gram
-                </Text>
+              <View className="flex-row items-center justify-between">
+                <View className="flex-1">
+                  <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 20, minHeight: 26 }}>Gold Price</Text>
+                  <Text className="font-semibold mt-1 text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15 }}>
+                    {formatCurrency(tokenData.price)} per gram
+                  </Text>
+                </View>
               </View>
               
               {/* Price Chart */}
               <View className="mt-2">
-                <PriceChart data={priceHistory} height={100} />
+                <PriceChart data={priceHistory} height={125} />
               </View>
 
               {lastUpdated && (
@@ -357,8 +366,8 @@ export default function DashboardScreen() {
                         </Text>
                       </View>
                       <View className="items-end flex-shrink-0">
-                        <Text className="font-medium text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15 }}>
-                          {isReceive ? '+' : '-'}{formattedValue} grams
+                        <Text className={`font-medium ${isReceive ? 'text-cambridge-blue' : 'text-boston-red'}`} numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15 }}>
+                          {isReceive ? '+' : '-'}{formattedValue} g
                         </Text>
                         <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 12 }}>
                           Block #{transfer.blockNumber}

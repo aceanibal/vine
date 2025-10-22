@@ -9,19 +9,30 @@ import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore, useCurrentWallet } from '~/lib/stores/useGlobalStore';
 import { approveAuthorizationWithTracking } from '~/lib/services/sponsored-orchestrator';
+import { authorizationTracker } from '~/lib/services/authorization-tracker';
 
 export default function AuthorizeScreen() {
   const { colors } = useColorScheme();
   const currentWallet = useCurrentWallet();
   const [isLoading, setIsLoading] = useState(false);
+  const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const checkWalletAuthorization = useGlobalStore((s) => s.checkWalletAuthorization);
 
   const handleAuthorize = async () => {
     if (!currentWallet?.address) return;
     setIsLoading(true);
+    setTransactionHash(null);
     try {
       console.log('[Authorize] Starting authorization...');
       const res = await approveAuthorizationWithTracking(currentWallet.address);
+      
+      // Get transaction hash from tracker
+      const txHash = authorizationTracker.getCurrentTransactionHash();
+      if (txHash) {
+        setTransactionHash(txHash);
+        console.log('[Authorize] Transaction hash:', txHash);
+      }
+      
       if (res.success) {
         console.log('[Authorize] Authorization successful, checking status...');
         // Use single source of truth to update authorization status
@@ -46,8 +57,16 @@ export default function AuthorizeScreen() {
   return (
     <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
       <View className="flex-1 rounded-t-3xl bg-white mt-6">
+        {/* Header with back button */}
+        <View className="flex-row items-center justify-between p-4">
+          <TouchableOpacity onPress={() => router.push('/(tabs)/dashboard')}>
+            <MaterialIcons name="arrow-back" size={24} color="#225D7C" />
+          </TouchableOpacity>
+          <View className="w-6" />
+          <View className="w-6" />
+        </View>
         
-        <ScrollView className="flex-1 px-6 mt-6">
+        <ScrollView className="flex-1 px-6">
           <View className="gap-6">
             {/* Header Section */}
             <View className="gap-3">
@@ -117,6 +136,21 @@ export default function AuthorizeScreen() {
                 for each transaction.
               </Text>
             </View>
+
+            {/* Transaction Hash Display */}
+            {transactionHash && (
+              <View className="gap-2 rounded-xl bg-lapis-lazuli/10 p-4">
+                <Text className="text-base font-semibold text-lapis-lazuli/80">Transaction Hash</Text>
+                <Text 
+                  className="text-lapis-lazuli font-mono" 
+                  style={{ fontSize: 14, lineHeight: 20 }}
+                  numberOfLines={2}
+                  adjustsFontSizeToFit
+                >
+                  {transactionHash.slice(0, 2)} {transactionHash.slice(2, 12)}...{transactionHash.slice(-8)}
+                </Text>
+              </View>
+            )}
           </View>
         </ScrollView>
 
