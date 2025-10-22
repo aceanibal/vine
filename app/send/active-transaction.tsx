@@ -3,8 +3,8 @@ import { router } from 'expo-router';
 import { View, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useRef, useState } from 'react';
+import { Button } from 'react-native-paper';
 
-import { Button } from '~/components/nativewindui/Button';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore } from '~/lib/stores/useGlobalStore';
@@ -13,27 +13,16 @@ export default function ActiveTransactionScreen() {
   const { colors } = useColorScheme();
   const activeTransaction = useGlobalStore((s) => s.activeTransaction);
   const clearActiveTransaction = useGlobalStore((s) => s.clearActiveTransaction);
-  const fetchTransactionData = useGlobalStore((s) => s.fetchTransactionData);
 
-  const prevTxStatusRef = useRef<string | null>(null);
   const [isCompleted, setIsCompleted] = useState(false);
 
-  // When a transaction succeeds, refresh data and show button
+  // Check if transaction is completed
   useEffect(() => {
     const currentStatus = activeTransaction?.status;
-    if (prevTxStatusRef.current !== 'success' && currentStatus === 'success') {
-      (async () => {
-        try {
-          await fetchTransactionData();
-        } catch (e) {
-          console.error('Failed to refresh activity after success:', e);
-        } finally {
-          setIsCompleted(true);
-        }
-      })();
+    if (currentStatus === 'success') {
+      setIsCompleted(true);
     }
-    prevTxStatusRef.current = currentStatus || null;
-  }, [activeTransaction?.status, fetchTransactionData]);
+  }, [activeTransaction?.status]);
 
   const formatAddress = (address: string) => {
     if (!address) return '';
@@ -49,73 +38,100 @@ export default function ActiveTransactionScreen() {
   };
 
   const getStatusColor = () => {
-    if (activeTransaction?.status === 'success') return '#16a34a';
-    if (activeTransaction?.status === 'failed') return '#dc2626';
-    return '#225D7C';
+    if (activeTransaction?.status === 'success') return '#7FAFA1'; // cambridge-blue
+    if (activeTransaction?.status === 'failed') return '#FC7E7E'; // boston-red
+    return '#D9A848'; // hunyadi-yellow for pending
+  };
+
+  const getStatusIcon = () => {
+    if (activeTransaction?.status === 'success') return 'check-circle';
+    if (activeTransaction?.status === 'failed') return 'error';
+    return 'hourglass-empty'; // pending
   };
 
   return (
     <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
       <View className="flex-1 rounded-t-3xl bg-white mt-6">
-        {/* Header with back/home buttons */}
-        <View className="flex-row items-center justify-between p-4">
-          <TouchableOpacity onPress={() => router.back()}>
-            <MaterialIcons name="arrow-back" size={24} color="#225D7C" />
-          </TouchableOpacity>
-          <View className="w-6" />
-          <TouchableOpacity onPress={() => router.push('/(tabs)/dashboard')}>
-            <MaterialIcons name="home" size={24} color="#225D7C" />
-          </TouchableOpacity>
-        </View>
         
-        <ScrollView className="flex-1 px-6">
+        <ScrollView className="flex-1 px-6 mt-6">
           <View className="gap-4">
-            {/* Activity Log - at top */}
+            {/* Status Section - at top */}
+            <View className="gap-2">
+              <Text className="text-base font-semibold text-lapis-lazuli/80">Status</Text>
+              <View className="flex-row items-center rounded-xl bg-lapis-lazuli/10 p-4 gap-3">
+                <MaterialIcons 
+                  name={getStatusIcon() as any} 
+                  size={24} 
+                  color={getStatusColor()} 
+                />
+                <Text className="text-lg font-bold" style={{ color: getStatusColor() }}>
+                  {activeTransaction.status?.toUpperCase()}
+                </Text>
+              </View>
+            </View>
+
+            {/* Details Section */}
+            <View className="gap-1">
+              <Text className="text-base font-semibold text-lapis-lazuli/80">Details</Text>
+              <View className="gap-1">
+                {activeTransaction?.operation && (
+                  <View className="flex-row justify-between">
+                    <Text className="text-sm text-lapis-lazuli/80">Operation:</Text>
+                    <Text className="text-sm text-lapis-lazuli flex-1 text-right">{activeTransaction.operation}</Text>
+                  </View>
+                )}
+                {activeTransaction?.step && (
+                  <View className="flex-row justify-between">
+                    <Text className="text-sm text-lapis-lazuli/80">Step:</Text>
+                    <Text className="text-sm text-lapis-lazuli flex-1 text-right">{activeTransaction.step}</Text>
+                  </View>
+                )}
+                {activeTransaction?.context?.amount && (
+                  <View className="flex-row justify-between">
+                    <Text className="text-sm text-lapis-lazuli/80">Amount:</Text>
+                    <Text className="text-sm text-lapis-lazuli flex-1 text-right">{activeTransaction.context.amount}</Text>
+                  </View>
+                )}
+                {activeTransaction?.context?.toAddress && (
+                  <View className="flex-row justify-between">
+                    <Text className="text-sm text-lapis-lazuli/80">Recipient:</Text>
+                    <Text className="text-sm text-lapis-lazuli flex-1 text-right font-mono">{formatAddress(activeTransaction.context.toAddress)}</Text>
+                  </View>
+                )}
+                {!activeTransaction && (
+                  <View className="flex-row justify-between">
+                    <Text className="text-sm text-lapis-lazuli/80">Status:</Text>
+                    <Text className="text-sm text-lapis-lazuli flex-1 text-right">No active transaction</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+
+            {/* Activity Log */}
             {activeTransaction.logs && activeTransaction.logs.length > 0 && (
-              <View className="gap-2">
-                <Text className="text-lg font-semibold text-lapis-lazuli">Activity Log</Text>
+              <View className="gap-3 rounded-xl bg-lapis-lazuli/10 p-4">
+                <Text className="text-lg font-semibold text-lapis-lazuli/80">Activity Log</Text>
                 <View className="gap-2">
-                  {activeTransaction.logs.slice(-8).map((log, idx) => (
-                    <View key={`${log.at}-${idx}`} className="gap-0.5">
-                      <Text className="text-xs text-blue-green">{new Date(log.at).toLocaleTimeString()}</Text>
-                      <Text className="text-sm text-lapis-lazuli">{log.message}</Text>
+                  {activeTransaction.logs.slice(-6).map((log, idx) => (
+                    <View key={`${log.at}-${idx}`} className="flex-row items-start gap-2">
+                      <View className="w-2 h-2 rounded-full bg-lapis-lazuli mt-2 flex-shrink-0" />
+                      <View className="flex-1">
+                        <Text className="text-xs text-blue-green">{new Date(log.at).toLocaleTimeString()}</Text>
+                        <Text className="text-sm text-lapis-lazuli/80">{log.message}</Text>
+                      </View>
                     </View>
                   ))}
                 </View>
               </View>
             )}
 
-            {/* Status Section */}
-            <View className="gap-1">
-              <Text className="text-base font-semibold text-lapis-lazuli">Status</Text>
-              <Text className="text-base font-medium" style={{ color: getStatusColor() }}>
-                {activeTransaction.status?.toUpperCase()}
-              </Text>
-            </View>
-
-            {/* Operation */}
-            {activeTransaction.operation && (
-              <View className="gap-1">
-                <Text className="text-base font-semibold text-lapis-lazuli">Operation</Text>
-                <Text className="text-base text-blue-green">{activeTransaction.operation}</Text>
-              </View>
-            )}
-
-            {/* Step */}
-            {activeTransaction.step && (
-              <View className="gap-1">
-                <Text className="text-base font-semibold text-lapis-lazuli">Current Step</Text>
-                <Text className="text-base text-blue-green">{activeTransaction.step}</Text>
-              </View>
-            )}
-
             {/* Transaction Hash */}
             {activeTransaction.hash && (
-              <View className="gap-1">
-                <Text className="text-base font-semibold text-lapis-lazuli">Transaction Hash</Text>
+              <View className="gap-2 rounded-xl bg-lapis-lazuli/10 p-4">
+                <Text className="text-base font-semibold text-lapis-lazuli/80">Transaction Hash</Text>
                 <Text 
                   className="text-lapis-lazuli font-mono" 
-                  style={{ fontSize: 16, lineHeight: 22 }}
+                  style={{ fontSize: 14, lineHeight: 20 }}
                   numberOfLines={2}
                   adjustsFontSizeToFit
                 >
@@ -124,57 +140,43 @@ export default function ActiveTransactionScreen() {
               </View>
             )}
 
-            {/* Amount */}
-            {activeTransaction.context?.amount && (
-              <View className="gap-1">
-                <Text className="text-base font-semibold text-lapis-lazuli">Amount</Text>
-                <Text className="text-lg font-medium text-lapis-lazuli">{activeTransaction.context.amount}</Text>
-              </View>
-            )}
             
-            {/* Recipient Address */}
-            {activeTransaction.context?.toAddress && (
-              <View className="gap-1">
-                <Text className="text-base font-semibold text-lapis-lazuli">Recipient Address</Text>
-                <Text 
-                  className="text-lapis-lazuli font-mono" 
-                  style={{ fontSize: 16, lineHeight: 22 }}
-                  numberOfLines={2}
-                  adjustsFontSizeToFit
-                >
-                  {formatAddress(activeTransaction.context.toAddress)}
-                </Text>
-              </View>
-            )}
-            
-            {/* Token Address */}
-            {activeTransaction.context?.tokenAddress && (
-              <View className="gap-1">
-                <Text className="text-base font-semibold text-lapis-lazuli">Token Address</Text>
-                <Text 
-                  className="text-lapis-lazuli font-mono" 
-                  style={{ fontSize: 16, lineHeight: 22 }}
-                  numberOfLines={2}
-                  adjustsFontSizeToFit
-                >
-                  {formatAddress(activeTransaction.context.tokenAddress)}
-                </Text>
-              </View>
-            )}
           </View>
         </ScrollView>
 
         {/* Return Button - Fixed at bottom */}
-        {isCompleted && (
-          <View className="px-6 pb-4 bg-white">
-            <Button className="bg-lapis-lazuli w-full" onPress={() => {
-              clearActiveTransaction();
-              router.replace('/(tabs)/dashboard');
-            }}>
-              <Text className="text-white">Return to Dashboard</Text>
-            </Button>
-          </View>
-        )}
+        <View className="px-4 pb-4 bg-white">
+          <Button 
+            mode="contained"
+            onPress={() => {
+              if (isCompleted) {
+                clearActiveTransaction();
+                router.replace('/(tabs)/dashboard');
+              }
+            }}
+            disabled={!isCompleted}
+            buttonColor="#225D7C"
+            style={{ 
+              backgroundColor: '#225D7C',
+              paddingVertical: 8,
+              opacity: isCompleted ? 1 : 0.5
+            }}
+            labelStyle={{ 
+              fontSize: 16,
+              color: '#FFFFFF'
+            }}
+            theme={{
+              colors: {
+                primary: '#225D7C',
+                onPrimary: '#FFFFFF',
+                surface: '#225D7C',
+                onSurface: '#FFFFFF'
+              }
+            }}
+          >
+            Return to Dashboard
+          </Button>
+        </View>
       </View>
     </SafeAreaView>
   );

@@ -44,6 +44,7 @@ module.exports = {
         },
         'lapis-lazuli': '#225D7C',
         'cambridge-blue': '#7FAFA1',
+        'breeze-blue': '#8FB3B3',
         'blue-green': '#3499BC',
         'celadon': '#A8CFB7',
         'hunyadi-yellow': '#D9A848',

@@ -21,14 +21,37 @@ export default function AmountScreen() {
   const [amount, setAmount] = useState('');
   const [inputMode, setInputMode] = useState<'token' | 'usd'>('token');
 
+  // Format number with commas
+  const formatNumberWithCommas = (num: string) => {
+    if (!num) return '';
+    
+    // Split by decimal point
+    const parts = num.split('.');
+    const wholePart = parts[0];
+    const decimalPart = parts[1];
+    
+    // Add commas to whole part
+    const formattedWhole = wholePart.replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+    
+    // Rejoin with decimal part if it exists
+    return decimalPart ? `${formattedWhole}.${decimalPart}` : formattedWhole;
+  };
+
+  // Parse number by removing commas
+  const parseNumber = (num: string) => {
+    return num.replace(/,/g, '');
+  };
+
   // Handle number pad key press
   const handleKeyPress = (key: string) => {
     if (key === 'backspace') {
-      setAmount((prev) => prev.slice(0, -1));
+      const newAmount = amount.slice(0, -1);
+      setAmount(formatNumberWithCommas(parseNumber(newAmount)));
     } else if (key === '.') {
       // Only allow one decimal point
       if (!amount.includes('.')) {
-        setAmount((prev) => prev + key);
+        const newAmount = amount + key;
+        setAmount(newAmount);
       }
     } else {
       // Limit decimal places based on input mode
@@ -41,7 +64,8 @@ export default function AmountScreen() {
           return;
         }
       }
-      setAmount((prev) => prev + key);
+      const newAmount = amount + key;
+      setAmount(formatNumberWithCommas(parseNumber(newAmount)));
     }
   };
 
@@ -123,7 +147,8 @@ export default function AmountScreen() {
   // Get the actual token amount to send (always in token units)
   const getActualTokenAmount = () => {
     if (!amount) return 0;
-    const amountNumber = parseFloat(amount);
+    const cleanAmount = parseNumber(amount);
+    const amountNumber = parseFloat(cleanAmount);
     if (isNaN(amountNumber)) return 0;
     
     if (inputMode === 'token') {
@@ -146,18 +171,19 @@ export default function AmountScreen() {
       return;
     }
 
-    const currentAmount = parseFloat(amount);
+    const cleanAmount = parseNumber(amount);
+    const currentAmount = parseFloat(cleanAmount);
     if (isNaN(currentAmount)) return;
 
     if (inputMode === 'token') {
       // Converting from token to USD (always 2 decimals)
       const usdValue = calculateUSDValue(currentAmount);
-      setAmount(usdValue.toFixed(2));
+      setAmount(formatNumberWithCommas(usdValue.toFixed(2)));
       setInputMode('usd');
     } else {
       // Converting from USD to token (show 2 decimals by default)
       const tokenValue = calculateTokenAmount(currentAmount);
-      setAmount(tokenValue.toFixed(2));
+      setAmount(formatNumberWithCommas(tokenValue.toFixed(2)));
       setInputMode('token');
     }
   };
@@ -168,7 +194,8 @@ export default function AmountScreen() {
       return;
     }
 
-    const amountNumber = parseFloat(amount);
+    const cleanAmount = parseNumber(amount);
+    const amountNumber = parseFloat(cleanAmount);
     if (isNaN(amountNumber) || amountNumber <= 0) {
       Alert.alert('Error', 'Amount must be greater than 0');
       return;
@@ -199,7 +226,7 @@ export default function AmountScreen() {
         <View className="flex-1 p-4 gap-4">
         {/* Title */}
         <View className="items-center py-2">
-          <Text className="text-2xl font-bold text-lapis-lazuli" numberOfLines={1}>
+          <Text className="text-2xl font-bold text-lapis-lazuli/80" numberOfLines={1}>
             Enter Amount
           </Text>
         </View>
@@ -208,22 +235,30 @@ export default function AmountScreen() {
           <View className="flex-row items-center justify-between px-4 py-3 rounded-xl">
             <View className="flex-1 mr-2">
               <Text className="text-sm text-blue-green" numberOfLines={1}>Balance</Text>
-              <Text className="text-base font-semibold text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit>
+              <Text className="text-base font-semibold text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit>
                 {inputMode === 'token' 
                   ? `${parseFloat(getTokenBalance()).toFixed(2)} ${predefinedToken.symbol}`
                   : formatCurrency(calculateUSDValue(parseFloat(getTokenBalance())))
                 }
               </Text>
             </View>
-            <TouchableOpacity 
+            <Button 
+              mode="text"
               onPress={toggleInputMode}
-              className="flex-row items-center gap-2 px-3 py-2 rounded-lg flex-shrink-0"
+              style={{ 
+                paddingHorizontal: 16,
+                paddingVertical: 12,
+                minHeight: 48
+              }}
+              labelStyle={{ 
+                fontSize: 16,
+                fontWeight: '600',
+                color: '#225D7C'
+              }}
+              icon={() => <MaterialIcons name="swap-horiz" size={20} color="#225D7C" />}
             >
-              <MaterialIcons name="swap-horiz" size={18} color="#225D7C" />
-              <Text className="text-sm font-medium text-cambridge-blue" numberOfLines={1}>
-                {inputMode === 'token' ? predefinedToken.symbol : 'USD'}
-              </Text>
-            </TouchableOpacity>
+              {inputMode === 'token' ? predefinedToken.symbol : 'USD'}
+            </Button>
           </View>
         ) : (
           <View className="rounded-xl border border-hunyadi-yellow bg-celadon p-4">
@@ -237,33 +272,36 @@ export default function AmountScreen() {
         )}
 
         {/* Amount Display */}
-        <View className="flex-1 items-center justify-center gap-2 px-4">
-          <Text className="text-6xl font-bold text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit>
+        <View className="flex-1 items-center justify-center gap-1 px-4">
+          <Text className="text-6xl font-bold text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit>
             {amount || '0'}
           </Text>
-          {predefinedToken && amount && (
+          {/* {predefinedToken && amount && (
             <Text className="text-xl text-blue-green" numberOfLines={1} adjustsFontSizeToFit>
               {inputMode === 'token' 
                 ? `≈ ${formatCurrency(calculateUSDValue(parseFloat(amount) || 0))}`
                 : `≈ ${getFormattedTokenAmount()} ${predefinedToken.symbol}`
               }
             </Text>
-          )}
+          )} */}
           {/* Insufficient balance warning */}
-          {amount && predefinedToken && getActualTokenAmount() > parseFloat(getTokenBalance()) && (
-            <View className="flex-row items-center gap-1 mt-2">
-              <MaterialIcons name="error" size={16} color="#dc2626" />
-              <Text className="text-sm font-semibold text-red-600" numberOfLines={1}>
-                Insufficient balance
-              </Text>
-            </View>
-          )}
-          <Text className="text-sm text-blue-green mt-2" numberOfLines={2}>
+     
+          <Text className="text-sm text-lapis-lazuli/80 mt-2" numberOfLines={2}>
             {inputMode === 'token' 
               ? `Amount in ${predefinedToken?.symbol || 'tokens'}`
               : 'Amount in USD'
             }
           </Text>
+          {/* Fixed height placeholder for insufficient balance warning */}
+          <View className="h-6 justify-center">
+            {amount && predefinedToken && getActualTokenAmount() > parseFloat(getTokenBalance()) && (
+              <View className="flex-row items-center gap-1">
+                <Text className="text-sm font-semibold text-boston-red" numberOfLines={1}>
+                  Insufficient balance
+                </Text>
+              </View>
+            )}
+          </View>
         </View>
 
         {/* Number Pad */}
@@ -275,8 +313,24 @@ export default function AmountScreen() {
             mode="contained"
             onPress={handleContinue}
             disabled={!amount || !predefinedToken}
-            style={{ backgroundColor: '#225D7C', paddingVertical: 8 }}
-            labelStyle={{ fontSize: 16 }}
+            buttonColor="#225D7C"
+            style={{ 
+              paddingVertical: 8,
+              backgroundColor: '#225D7C',
+              opacity: (!amount || !predefinedToken) ? 0.5 : 1
+            }}
+            labelStyle={{ 
+              fontSize: 16,
+              color: '#FFFFFF'
+            }}
+            theme={{
+              colors: {
+                primary: '#225D7C',
+                onPrimary: '#FFFFFF',
+                surface: '#225D7C',
+                onSurface: '#FFFFFF'
+              }
+            }}
           >
             Continue
           </Button>

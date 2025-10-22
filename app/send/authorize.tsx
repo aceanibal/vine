@@ -63,7 +63,23 @@ export default function AuthorizeScreen() {
           <Text className="text-sm text-blue-green">
             To send transactions, your wallet must authorize our delegation contract. This one-time action lets us sponsor your gas fees.
           </Text>
-          <Button onPress={handleAuthorize} disabled={isLoading} className="mt-2 bg-lapis-lazuli">
+          <Button 
+            onPress={handleAuthorize} 
+            disabled={isLoading} 
+            className="mt-2 bg-lapis-lazuli"
+            style={{
+              backgroundColor: '#225D7C',
+              opacity: isLoading ? 0.5 : 1
+            }}
+            theme={{
+              colors: {
+                primary: '#225D7C',
+                onPrimary: '#FFFFFF',
+                surface: '#225D7C',
+                onSurface: '#FFFFFF'
+              }
+            }}
+          >
             {isLoading ? (
               <View className="flex-row items-center gap-2">
                 <MaterialIcons name="hourglass-empty" size={20} color="white" />

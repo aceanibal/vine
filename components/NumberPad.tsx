@@ -31,14 +31,15 @@ export function NumberPad({ onKeyPress }: NumberPadProps) {
             <Pressable key={key} onPress={() => handleKeyPress(key)} className="flex-1">
               {({ pressed }) => (
                 <View
-                  className="h-16 items-center justify-center rounded-xl border border-lapis-lazuli shadow-lg shadow-lapis-lazuli"
+                  className="h-16 items-center justify-center rounded-xl border border-breeze-blue/10 shadow-lg shadow-lapis-lazuli"
                   style={{
                     shadowColor: '#225D7C',
                     shadowOffset: { width: 0, height: 2 },
                     shadowOpacity: 0.25,
                     shadowRadius: 3.84,
                     elevation: 5,
-                    backgroundColor: pressed ? '#225D7C' : 'transparent',
+                    backgroundColor: pressed ? '#225D7C' : 'rgba(52, 153, 188, 0.05)',
+                    borderColor: pressed ? '#225D7C' : 'rgba(52, 153, 188, 0.05)',
                   }}
                 >
                   {key === 'backspace' ? (
@@ -47,6 +48,13 @@ export function NumberPad({ onKeyPress }: NumberPadProps) {
                       size={24}
                       color={pressed ? '#FFFFFF' : '#225D7C'}
                     />
+                  ) : key === '.' ? (
+                    <Text
+                      className="text-3xl font-bold"
+                      style={{ color: pressed ? '#FFFFFF' : '#225D7C' }}
+                    >
+                      •
+                    </Text>
                   ) : (
                     <Text
                       className="text-2xl font-semibold"

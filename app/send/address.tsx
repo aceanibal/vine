@@ -227,7 +227,8 @@ export default function AddressScreen() {
       return {
         icon: 'check-circle',
         message: 'Eligible for free transactions',
-        color: '#16a34a',
+        color: '#7FAFA1',
+        backgroundColor: 'rgba(127, 175, 161, 0.1)',
       };
     }
 
@@ -302,12 +303,21 @@ export default function AddressScreen() {
   return (
     <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
       <View className="flex-1 rounded-t-3xl bg-white mt-6">
-        {/* Header with back/home buttons */}
+        {/* Header with back/paste/home buttons */}
         <View className="flex-row items-center justify-between p-4">
           <TouchableOpacity onPress={handleBackNavigation}>
             <MaterialIcons name="arrow-back" size={24} color="#225D7C" />
           </TouchableOpacity>
-          <View className="w-6" />
+          
+          {/* Paste Button */}
+          <TouchableOpacity 
+            onPress={handlePaste}
+            className="flex-row items-center justify-center gap-1.5 px-3 py-1.5 rounded-lg bg-lapis-lazuli/5"
+          >
+            <MaterialIcons name="content-paste" size={16} color="#225D7C" />
+            <Text className="text-xs font-medium text-lapis-lazuli">Paste</Text>
+          </TouchableOpacity>
+          
           <TouchableOpacity onPress={() => router.push('/(tabs)/dashboard')}>
             <MaterialIcons name="home" size={24} color="#225D7C" />
           </TouchableOpacity>
@@ -319,20 +329,12 @@ export default function AddressScreen() {
             <View className="gap-4">
         {/* Recipient Address Input */}
         <View className="gap-4">
-          <TouchableOpacity 
-            onPress={handlePaste}
-            className="flex-row items-center justify-center gap-1.5 py-2"
-          >
-            <MaterialIcons name="content-paste" size={18} color="#225D7C" />
-            <Text className="text-sm font-medium text-lapis-lazuli">Paste</Text>
-          </TouchableOpacity>
-          
           <Text className="text-center font-semibold text-lapis-lazuli">
             Enter Address
           </Text>
           
           {/* Large Centered Address Display */}
-          <View className="items-center justify-center gap-3">
+          <View className="items-center justify-center gap-2">
             <TouchableOpacity 
               activeOpacity={1}
               onPress={() => textInputRef.current?.focus()}
@@ -342,8 +344,7 @@ export default function AddressScreen() {
                 ref={textInputRef}
                 value={recipientAddress.length > 22 ? formatAddressForDisplay() : recipientAddress}
                 onChangeText={handleAddressChange}
-                placeholder="..."
-                placeholderTextColor="#7FAFA1"
+                placeholder=""
                 className="text-lapis-lazuli font-mono text-center w-full"
                 style={{
                   fontSize: getFontSize(),
@@ -359,6 +360,8 @@ export default function AddressScreen() {
                 keyboardType="default"
                 selectTextOnFocus={false}
                 scrollEnabled={false}
+                autoFocus={true}
+                caretHidden={false}
               />
               {isCheckingAddress && (
                 <View className="mt-2">
@@ -367,20 +370,24 @@ export default function AddressScreen() {
               )}
             </TouchableOpacity>
 
-            {/* Status Message */}
-            {(() => {
-              const status = getStatusMessage();
-              if (!status) return null;
-              
-              return (
-                <View className="flex-row items-center gap-2">
-                  <MaterialIcons name={status.icon as any} size={16} color={status.color} />
-                  <Text className="text-sm" style={{ color: status.color }}>
-                    {status.message}
-                  </Text>
-                </View>
-              );
-            })()}
+            {/* Fixed height placeholder for status messages */}
+            <View>
+              {(() => {
+                const status = getStatusMessage();
+                if (!status) return null;
+                
+                return (
+                  <View 
+                    className="flex-row items-center gap-2 justify-center rounded-xl p-2"
+                  >
+                    <MaterialIcons name={status.icon as any} size={16} color={status.color} />
+                    <Text className="text-sm text-cambridge-blue">
+                      {status.message}
+                    </Text>
+                  </View>
+                );
+              })()}
+            </View>
           </View>
         </View>
 
@@ -394,13 +401,13 @@ export default function AddressScreen() {
               <TouchableOpacity
                 key={item}
                 onPress={() => handleSelectAddress(item)}
-                className="flex-row items-center justify-between p-4 rounded-xl border border-blue-green"
+                className="flex-row items-center justify-between p-4 rounded-xl bg-cambridge-blue/10"
               >
                 <View className="flex-row items-center gap-3">
-                  <View className="w-10 h-10 rounded-full border border-blue-green items-center justify-center">
+                  <View className="w-10 h-10 rounded-full items-center justify-center">
                     <MaterialIcons name="account-circle" size={24} color="#225D7C" />
                   </View>
-                  <Text className="font-mono text-sm text-lapis-lazuli">
+                  <Text className="text-lg text-lapis-lazuli">
                     {formatAddress(item)}
                   </Text>
                 </View>
@@ -420,8 +427,24 @@ export default function AddressScreen() {
             mode="contained"
             onPress={handleContinue}
             disabled={!recipientAddress || !isValidAddress || isCheckingAddress}
-            style={{ backgroundColor: '#225D7C', paddingVertical: 8 }}
-            labelStyle={{ fontSize: 16 }}
+            buttonColor="#225D7C"
+            style={{ 
+              backgroundColor: '#225D7C',
+              paddingVertical: 8,
+              opacity: (!recipientAddress || !isValidAddress || isCheckingAddress) ? 0.5 : 1
+            }}
+            labelStyle={{ 
+              fontSize: 16,
+              color: '#FFFFFF'
+            }}
+            theme={{
+              colors: {
+                primary: '#225D7C',
+                onPrimary: '#FFFFFF',
+                surface: '#225D7C',
+                onSurface: '#FFFFFF'
+              }
+            }}
           >
             Continue
           </Button>

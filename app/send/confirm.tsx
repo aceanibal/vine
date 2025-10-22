@@ -418,13 +418,26 @@ export default function ConfirmScreen() {
           // Verified user - show sponsored/free button
           <Button 
             mode="contained"
-            buttonColor="#225D7C"
-            textColor="#FFFFFF"
             onPress={handleSendSponsored}
             disabled={isLoading}
-            style={{ borderRadius: 8 }}
-            contentStyle={{ paddingVertical: 8 }}
-            labelStyle={{ fontSize: 16, fontWeight: '600' }}
+            buttonColor="#225D7C"
+            style={{ 
+              backgroundColor: '#225D7C',
+              paddingVertical: 8,
+              opacity: isLoading ? 0.5 : 1
+            }}
+            labelStyle={{ 
+              fontSize: 16,
+              color: '#FFFFFF'
+            }}
+            theme={{
+              colors: {
+                primary: '#225D7C',
+                onPrimary: '#FFFFFF',
+                surface: '#225D7C',
+                onSurface: '#FFFFFF'
+              }
+            }}
           >
             {isLoading ? 'Sending...' : `Send ${predefinedToken?.symbol || 'Token'} (FREE)`}
           </Button>
@@ -433,26 +446,52 @@ export default function ConfirmScreen() {
           <>
             <Button 
               mode="contained"
-              buttonColor="#225D7C"
-              textColor="#FFFFFF"
               onPress={handleSendWithFee}
               disabled={isLoading || !balanceCheck.hasBalance}
-              style={{ borderRadius: 8 }}
-              contentStyle={{ paddingVertical: 8 }}
-              labelStyle={{ fontSize: 16, fontWeight: '600' }}
+              buttonColor="#225D7C"
+              style={{ 
+                backgroundColor: '#225D7C',
+                paddingVertical: 8,
+                opacity: (isLoading || !balanceCheck.hasBalance) ? 0.5 : 1
+              }}
+              labelStyle={{ 
+                fontSize: 16,
+                color: '#FFFFFF'
+              }}
+              theme={{
+                colors: {
+                  primary: '#225D7C',
+                  onPrimary: '#FFFFFF',
+                  surface: '#225D7C',
+                  onSurface: '#FFFFFF'
+                }
+              }}
             >
               {isLoading ? 'Sending...' : `Send ${formatTokenAmount(tokenAmount)} ${predefinedToken?.symbol || ''} + ${formatNetworkFee(networkFee)}`}
             </Button>
             
             <Button 
               mode="contained"
-              buttonColor="#4F7D96"
-              textColor="#FFFFFF"
               onPress={handleSendWithFeeDeducted}
               disabled={isLoading}
-              style={{ borderRadius: 8 }}
-              contentStyle={{ paddingVertical: 8 }}
-              labelStyle={{ fontSize: 16, fontWeight: '600' }}
+              buttonColor="#4F7D96"
+              style={{ 
+                backgroundColor: '#4F7D96',
+                paddingVertical: 8,
+                opacity: isLoading ? 0.5 : 1
+              }}
+              labelStyle={{ 
+                fontSize: 16,
+                color: '#FFFFFF'
+              }}
+              theme={{
+                colors: {
+                  primary: '#4F7D96',
+                  onPrimary: '#FFFFFF',
+                  surface: '#4F7D96',
+                  onSurface: '#FFFFFF'
+                }
+              }}
             >
               {isLoading ? 'Sending...' : `Send ${formatAmountAfterFee(tokenAmount, networkFee)} ${predefinedToken?.symbol || ''} (Fee deducted)`}
             </Button>
