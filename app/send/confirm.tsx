@@ -113,9 +113,17 @@ export default function ConfirmScreen() {
     return result.toFixed(2);
   };
 
-  const shortenAddress = (address: string) => {
-    if (!address || address.length < 10) return address;
-    return `${address.slice(0, 6)}...${address.slice(-4)}`;
+  const formatAddress = (address: string) => {
+    if (!address) return '';
+    const prefix = address.slice(0, 2); // 0x
+    const rest = address.slice(2);
+    const chunks: string[] = [];
+    for (let i = 0; i < rest.length; i += 10) {
+      chunks.push(rest.slice(i, i + 10));
+    }
+    const firstRow = `${prefix} ${chunks[0] || ''}${chunks[1] ? ' ' + chunks[1] : ''}`;
+    const secondRow = `   ${chunks[2] || ''}${chunks[3] ? ' ' + chunks[3] : ''}`;
+    return `${firstRow}\n${secondRow}`.trim();
   };
 
   // Get token balance in readable format (same as amount.tsx)
@@ -320,139 +328,107 @@ export default function ConfirmScreen() {
           </TouchableOpacity>
         </View>
         
-        <ScrollView className="flex-1" contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 8 }}>
-        <View className="gap-3">
-          {/* Amount to send */}
-          <View className="gap-2">
-            <Text className="text-sm font-semibold text-lapis-lazuli">Amount to send</Text>
-            <View className="items-center">
-              <Text className="font-bold text-2xl text-lapis-lazuli">
-                {formatTokenAmount(tokenAmount)} {predefinedToken?.symbol || ''}
-              </Text>
-              <Text className="text-blue-green text-sm">
-                {formatCurrency(usdValue)}
-              </Text>
-            </View>
-          </View>
-
-          {/* Divider */}
-          <View className="h-px bg-blue-green opacity-20 my-1" />
-
-          {/* Recipient Details */}
-          <View className="gap-2">
-            <Text className="text-sm font-semibold text-lapis-lazuli">Recipient</Text>
-            <View className="gap-1.5">
-              <View className="flex-row items-center justify-between">
-                <Text className="text-sm text-blue-green">Address</Text>
-                <Text className="font-mono text-sm font-semibold text-lapis-lazuli">
-                  {shortenAddress(recipientAddress)}
+        <ScrollView className="flex-1 px-6 mt-6">
+          <View className="gap-4">
+            {/* Amount Section */}
+            <View className="gap-2">
+              <Text className="text-base font-semibold text-lapis-lazuli/80">Amount to Send</Text>
+              <View className="items-center rounded-xl bg-lapis-lazuli/5 p-4">
+                <Text className="font-bold text-2xl text-lapis-lazuli">
+                  {formatTokenAmount(tokenAmount)} {predefinedToken?.symbol || ''}
+                </Text>
+                <Text className="text-blue-green text-sm mt-1">
+                  {formatCurrency(usdValue)}
                 </Text>
               </View>
-              <View className="flex-row items-center justify-between">
-                <Text className="text-sm text-blue-green">Status</Text>
-                <View className="flex-row items-center gap-1">
-                  {isVerifiedUser ? (
-                    <>
-                      <MaterialIcons name="check-circle" size={14} color="#225D7C" />
-                      <Text className="text-sm font-semibold text-lapis-lazuli">Verified User</Text>
-                    </>
-                  ) : (
-                    <>
-                      <MaterialIcons name="warning" size={14} color="#4F7D96" />
-                      <Text className="text-sm font-semibold text-blue-green">Not Verified</Text>
-                    </>
+            </View>
+
+            {/* Recipient Section */}
+            <View className="gap-2">
+              <Text className="text-base font-semibold text-lapis-lazuli/80">Recipient</Text>
+              <View className="rounded-xl bg-cambridge-blue/10 p-4">
+                <View className="gap-3">
+                  <View className="gap-2">
+                    <Text className="text-sm text-lapis-lazuli/80">Address</Text>
+                    <Text 
+                      className="text-lapis-lazuli font-mono font-bold" 
+                      style={{ fontSize: 16, lineHeight: 22 }}
+                      numberOfLines={2}
+                      adjustsFontSizeToFit
+                    >
+                      {formatAddress(recipientAddress)}
+                    </Text>
+                  </View>
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-sm text-lapis-lazuli/80">Status</Text>
+                    <View className="flex-row items-center gap-1">
+                      {isVerifiedUser ? (
+                        <>
+                          <MaterialIcons name="check-circle" size={16} color="#7FAFA1" />
+                          <Text className="text-sm font-semibold text-cambridge-blue">Verified User</Text>
+                        </>
+                      ) : (
+                        <>
+                          <MaterialIcons name="warning" size={16} color="#225D7C" />
+                          <Text className="text-sm text-lapis-lazuli/80">Not Verified</Text>
+                        </>
+                      )}
+                    </View>
+                  </View>
+                  {!isVerifiedUser && (
+                    <View className="px-2 rounded-lg">
+                      <Text className="text-xs text-lapis-lazuli/70 leading-relaxed">
+                        Address not delegated to our contract. Network fees apply.
+                        Recipient can delegate to get free transactions.
+                      </Text>
+                    </View>
                   )}
                 </View>
               </View>
             </View>
-          </View>
 
-          {/* Fee Information - only for non-verified users */}
-          {!isVerifiedUser && (
-            <>
-              {/* Divider */}
-              <View className="h-px bg-blue-green opacity-20 my-1" />
-              
+            {/* Fee Information - only for non-verified users */}
+            {!isVerifiedUser && (
               <View className="gap-2">
-                <Text className="text-sm font-semibold text-lapis-lazuli">Fees</Text>
-                <View className="gap-1.5">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-sm text-blue-green">Network Fee (0.25%)</Text>
-                    <Text className="text-sm font-semibold text-lapis-lazuli">
-                      {formatNetworkFee(networkFee)}
-                    </Text>
-                  </View>
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-sm text-blue-green">Fee Status</Text>
-                    <Text className="text-sm font-semibold text-lapis-lazuli">REQUIRED</Text>
+                <Text className="text-base font-semibold text-lapis-lazuli/80">Network Fees</Text>
+                <View className="rounded-xl bg-hunyadi-yellow/10 p-4">
+                  <View className="gap-3">
+                    <View className="flex-row items-center justify-between">
+                      <Text className="text-sm text-lapis-lazuli/80">Network Fee (0.25%)</Text>
+                      <Text className="text-sm font-semibold text-lapis-lazuli">
+                        {formatNetworkFee(networkFee)}
+                      </Text>
+                    </View>
+                    <View className="flex-row items-center justify-between">
+                      <Text className="text-sm text-lapis-lazuli/80">Fee Status</Text>
+                      <View className="flex-row items-center gap-1">
+                        <MaterialIcons name="info" size={14} color="#4F7D96" />
+                        <Text className="text-sm font-semibold text-lapis-lazuli">REQUIRED</Text>
+                      </View>
+                    </View>
                   </View>
                 </View>
               </View>
-            </>
-          )}
-        </View>
+            )}
+          </View>
         </ScrollView>
 
-        {/* Total and Buttons at bottom - fixed */}
-        <View className="px-4 pb-4 pt-2 gap-2">
-        {/* Divider */}
-        <View className="h-px bg-blue-green opacity-20 mb-1" />
-        
-        {/* Total Cost */}
-        <View className="pb-1">
-          <View className="flex-row items-center justify-between">
-            <Text className="text-sm font-semibold text-lapis-lazuli">Total Cost</Text>
-            <Text className="text-sm font-bold text-lapis-lazuli">
-              {formatTokenAmount(tokenAmount)} {predefinedToken?.symbol || 'XRBG'}
-            </Text>
-          </View>
-          {!isVerifiedUser && (
-            <View className="flex-row items-center justify-between">
-              <Text className="text-sm text-blue-green">+ Network Fee</Text>
-              <Text className="text-sm text-blue-green">{formatNetworkFee(networkFee)}</Text>
-            </View>
-          )}
-        </View>
+        {/* Buttons at bottom - fixed */}
+        <View className="px-4 pb-4 pt-2">
+          {/* Divider */}
+          <View className="h-px bg-blue-green opacity-20 mb-4" />
 
-        {isVerifiedUser ? (
-          // Verified user - show sponsored/free button
-          <Button 
-            mode="contained"
-            onPress={handleSendSponsored}
-            disabled={isLoading}
-            buttonColor="#225D7C"
-            style={{ 
-              backgroundColor: '#225D7C',
-              paddingVertical: 8,
-              opacity: isLoading ? 0.5 : 1
-            }}
-            labelStyle={{ 
-              fontSize: 16,
-              color: '#FFFFFF'
-            }}
-            theme={{
-              colors: {
-                primary: '#225D7C',
-                onPrimary: '#FFFFFF',
-                surface: '#225D7C',
-                onSurface: '#FFFFFF'
-              }
-            }}
-          >
-            {isLoading ? 'Sending...' : `Send ${predefinedToken?.symbol || 'Token'} (FREE)`}
-          </Button>
-        ) : (
-          // Non-verified user - show both buttons, disable first if insufficient balance
-          <>
+          {isVerifiedUser ? (
+            // Verified user - show sponsored/free button
             <Button 
               mode="contained"
-              onPress={handleSendWithFee}
-              disabled={isLoading || !balanceCheck.hasBalance}
+              onPress={handleSendSponsored}
+              disabled={isLoading}
               buttonColor="#225D7C"
               style={{ 
                 backgroundColor: '#225D7C',
-                paddingVertical: 8,
-                opacity: (isLoading || !balanceCheck.hasBalance) ? 0.5 : 1
+                paddingVertical: 12,
+                opacity: isLoading ? 0.5 : 1
               }}
               labelStyle={{ 
                 fontSize: 16,
@@ -467,36 +443,64 @@ export default function ConfirmScreen() {
                 }
               }}
             >
-              {isLoading ? 'Sending...' : `Send ${formatTokenAmount(tokenAmount)} ${predefinedToken?.symbol || ''} + ${formatNetworkFee(networkFee)}`}
+              {isLoading ? 'Sending...' : `Send ${predefinedToken?.symbol || 'Token'} (FREE)`}
             </Button>
-            
-            <Button 
-              mode="contained"
-              onPress={handleSendWithFeeDeducted}
-              disabled={isLoading}
-              buttonColor="#4F7D96"
-              style={{ 
-                backgroundColor: '#4F7D96',
-                paddingVertical: 8,
-                opacity: isLoading ? 0.5 : 1
-              }}
-              labelStyle={{ 
-                fontSize: 16,
-                color: '#FFFFFF'
-              }}
-              theme={{
-                colors: {
-                  primary: '#4F7D96',
-                  onPrimary: '#FFFFFF',
-                  surface: '#4F7D96',
-                  onSurface: '#FFFFFF'
-                }
-              }}
-            >
-              {isLoading ? 'Sending...' : `Send ${formatAmountAfterFee(tokenAmount, networkFee)} ${predefinedToken?.symbol || ''} (Fee deducted)`}
-            </Button>
-          </>
-        )}
+          ) : (
+            // Non-verified user - show both buttons, disable first if insufficient balance
+            <View className="gap-3">
+              <Button 
+                mode="contained"
+                onPress={handleSendWithFee}
+                disabled={isLoading || !balanceCheck.hasBalance}
+                buttonColor="#225D7C"
+                style={{ 
+                  backgroundColor: '#225D7C',
+                  paddingVertical: 12,
+                  opacity: (isLoading || !balanceCheck.hasBalance) ? 0.5 : 1
+                }}
+                labelStyle={{ 
+                  fontSize: 16,
+                  color: '#FFFFFF'
+                }}
+                theme={{
+                  colors: {
+                    primary: '#225D7C',
+                    onPrimary: '#FFFFFF',
+                    surface: '#225D7C',
+                    onSurface: '#FFFFFF'
+                  }
+                }}
+              >
+                {isLoading ? 'Sending...' : `Send ${formatTokenAmount(tokenAmount)} ${predefinedToken?.symbol || ''} + Fee`}
+              </Button>
+              
+              <Button 
+                mode="contained"
+                onPress={handleSendWithFeeDeducted}
+                disabled={isLoading}
+                buttonColor="#4F7D96"
+                style={{ 
+                  backgroundColor: '#4F7D96',
+                  paddingVertical: 12,
+                  opacity: isLoading ? 0.5 : 1
+                }}
+                labelStyle={{ 
+                  fontSize: 16,
+                  color: '#FFFFFF'
+                }}
+                theme={{
+                  colors: {
+                    primary: '#4F7D96',
+                    onPrimary: '#FFFFFF',
+                    surface: '#4F7D96',
+                    onSurface: '#FFFFFF'
+                  }
+                }}
+              >
+                {isLoading ? 'Sending...' : `Send ${formatAmountAfterFee(tokenAmount, networkFee)} ${predefinedToken?.symbol || ''} (Fee deducted)`}
+              </Button>
+            </View>
+          )}
         </View>
       </View>
     </SafeAreaView>

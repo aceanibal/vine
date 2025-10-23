@@ -12,6 +12,7 @@ import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore, useCurrentWallet, usePredefinedToken, usePriceHistory } from '~/lib/stores/useGlobalStore';
 import { PriceChart } from '~/components/PriceChart';
+import ReceiveScreen from './receive';
 
 // Helper functions
 const formatCurrency = (amount: number) => {
@@ -397,61 +398,12 @@ export default function DashboardScreen() {
             onPress={() => setShowReceiveModal(false)}
           />
           <View className="bg-white" style={{ height: '85%' }}>
-            <SafeAreaView className="flex-1" edges={['bottom']}>
-              <View className="flex-row items-center justify-end p-4">
-                <TouchableOpacity onPress={() => setShowReceiveModal(false)}>
-                  <MaterialIcons name="close" size={28} color="#225D7C" />
-                </TouchableOpacity>
-              </View>
-              
-              <ScrollView className="flex-1" contentContainerClassName="p-6">
-                <View className="gap-4">
-                  {/* QR Code Section */}
-                  <View className="items-center">
-                    <Text className="font-semibold text-center text-lapis-lazuli/80 mb-3" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 20, minHeight: 26 }}>
-                      Your Wallet Address
-                    </Text>
-                    <View className="bg-white p-4 rounded-xl overflow-hidden">
-                      <QRCode
-                        value={currentWallet?.address || ''}
-                        size={200}
-                        color="black"
-                        backgroundColor="white"
-                      />
-                    </View>
-                    <Text className="text-blue-green text-center mt-3" numberOfLines={2} adjustsFontSizeToFit style={{ fontSize: 15, lineHeight: 22 }}>
-                      Scan this QR code to send cryptocurrencies to your wallet
-                    </Text>
-                  </View>
-
-                  {/* Wallet Address */}
-                  <View className="mt-4">
-                    <Text className="font-semibold text-lapis-lazuli/80 mb-2" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 20, minHeight: 26 }}>
-                      Wallet Address
-                    </Text>
-                    <Text className="font-mono text-lapis-lazuli" numberOfLines={2} adjustsFontSizeToFit style={{ fontSize: 15 }}>
-                      {currentWallet?.address}
-                    </Text>
-                    <Text className="text-blue-green mt-2" numberOfLines={2} adjustsFontSizeToFit style={{ fontSize: 15, lineHeight: 22 }}>
-                      Share this address to receive cryptocurrencies
-                    </Text>
-                  </View>
-
-                  {/* Action Button */}
-                  <Button 
-                    mode="contained"
-                    buttonColor="#225D7C"
-                    onPress={copyToClipboard}
-                    style={{ width: '100%', marginTop: 8 }}
-                    contentStyle={{ paddingVertical: 12 }}
-                  >
-                    <Text className="font-semibold" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 18, color: '#FFFFFF' }}>
-                      Copy Address
-                    </Text>
-                  </Button>
-                </View>
-              </ScrollView>
-            </SafeAreaView>
+            <View className="flex-row items-center justify-end p-4">
+              <TouchableOpacity onPress={() => setShowReceiveModal(false)}>
+                <MaterialIcons name="close" size={28} color="#225D7C" />
+              </TouchableOpacity>
+            </View>
+            <ReceiveScreen />
           </View>
         </View>
       </Modal>

@@ -134,8 +134,42 @@ export default function AddressScreen() {
   };
 
   // Handle selecting a previous address
-  const handleSelectAddress = (address: string) => {
+  const handleSelectAddress = async (address: string) => {
     handleAddressChange(address);
+    
+    // Wait a moment for the address to be set and validated
+    setTimeout(async () => {
+      // Check if the address is valid before proceeding
+      const isValid = ethers.isAddress(address);
+      if (isValid) {
+        // Check delegation status for the selected address
+        try {
+          const status = await checkDelegationStatus(address);
+          const isVerified = !!(status.isDelegated && status.matchesTarget);
+          
+          // Navigate to confirmation screen
+          router.push({
+            pathname: '/send/confirm',
+            params: {
+              amount,
+              recipientAddress: address,
+              isVerifiedUser: isVerified ? 'true' : 'false',
+            },
+          });
+        } catch (error) {
+          console.error('[Send Address] Failed to check delegation for selected address:', error);
+          // Still proceed even if delegation check fails
+          router.push({
+            pathname: '/send/confirm',
+            params: {
+              amount,
+              recipientAddress: address,
+              isVerifiedUser: 'false',
+            },
+          });
+        }
+      }
+    }, 100);
   };
 
   // Handle pasting from clipboard

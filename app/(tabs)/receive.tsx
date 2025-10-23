@@ -1,33 +1,20 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { router, useLocalSearchParams } from 'expo-router';
-import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
+import { View, ScrollView } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 
-import { Button } from '~/components/nativewindui/Button';
+import { Button } from 'react-native-paper';
 import { Text } from '~/components/nativewindui/Text';
-import { useColorScheme } from '~/lib/useColorScheme';
 import { useCurrentWallet } from '~/lib/stores/useGlobalStore';
 
 export default function ReceiveScreen() {
-  const { colors } = useColorScheme();
   const currentWallet = useCurrentWallet();
-  const params = useLocalSearchParams();
   const [isLoading, setIsLoading] = useState(true);
   
-  // Get the source screen to determine where to go back
-  const source = params.source as string;
   
-  const handleBackNavigation = () => {
-    if (source === 'transfer') {
-      router.push('/(tabs)/transfer' as any);
-    } else {
-      // Default fallback
-      router.back();
-    }
-  };
+  const walletAddress = currentWallet?.address;
 
   useEffect(() => {
     setIsLoading(false);
@@ -74,50 +61,67 @@ export default function ReceiveScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-blue-green" edges={['top']}>
-      <ScrollView className="flex-1" contentContainerClassName="p-6">
-        <View className="gap-4">
-          {/* QR Code Section */}
-          <View className="items-center">
-            <Text className="font-semibold text-center text-lapis-lazuli mb-3">
-              Your Wallet Address
-            </Text>
-            <View className="bg-white p-4 rounded-xl overflow-hidden">
-              <QRCode
-                value={currentWallet?.address || ''}
-                size={200}
-                color="black"
-                backgroundColor="white"
-              />
+    <SafeAreaView className="flex-1" edges={['top']}>
+      <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
+        <View className="flex-1 p-6">
+          <View className="gap-6">
+            {/* QR Code Section */}
+            <View className="items-center">
+              <View className="bg-white px-4 pb-4 rounded-xl overflow-hidden">
+                <QRCode
+                  value={currentWallet?.address || ''}
+                  size={200}
+                  color="black"
+                  backgroundColor="white"
+                />
+              </View>
+              <Text className="text-blue-green text-center mt-3" numberOfLines={2} adjustsFontSizeToFit style={{ fontSize: 16, lineHeight: 22 }}>
+                Show this QR code to share your wallet address
+              </Text>
             </View>
-            <Text className="text-xs text-lapis-lazuli text-center mt-3">
-              Scan this QR code to send cryptocurrencies to your wallet
-            </Text>
-          </View>
 
-          {/* Wallet Address */}
-          <View className="mt-4">
-            <Text className="font-semibold text-lapis-lazuli mb-2">
-              Wallet Address
-            </Text>
-            <Text className="font-mono text-lapis-lazuli">
-              {currentWallet?.address}
-            </Text>
-            <Text className="text-xs text-lapis-lazuli mt-2">
-              Share this address to receive cryptocurrencies
-            </Text>
+            {/* Wallet Address */}
+            <View className="items-center">
+              <Text className="font-semibold text-center text-blue-green mb-2" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 18, minHeight: 26 }}>
+                Wallet Address
+              </Text>
+              <Text 
+                className="text-lapis-lazuli font-bold font-mono text-center" 
+                style={{ fontSize: 20, lineHeight: 22 }}
+                numberOfLines={2} 
+                adjustsFontSizeToFit
+              >
+                {walletAddress ? (() => {
+                  const prefix = walletAddress.slice(0, 2); // 0x
+                  const rest = walletAddress.slice(2);
+                  const chunks: string[] = [];
+                  for (let i = 0; i < rest.length; i += 10) {
+                    chunks.push(rest.slice(i, i + 10));
+                  }
+                  const firstRow = `${prefix} ${chunks[0] || ''}${chunks[1] ? ' ' + chunks[1] : ''}`;
+                  const secondRow = `   ${chunks[2] || ''}${chunks[3] ? ' ' + chunks[3] : ''}`;
+                  return `${firstRow}\n${secondRow}`.trim();
+                })() : ''}
+              </Text>
+            </View>
           </View>
-
-          {/* Action Button */}
-          <Button 
-            variant="primary"
-            className="bg-lapis-lazuli mt-2"
-            onPress={copyToClipboard}
-          >
-            <Text className="text-white font-semibold">Copy Address</Text>
-          </Button>
         </View>
       </ScrollView>
+      
+      {/* Fixed Button at Bottom */}
+      <View className="px-6 mb-12 bg-white">
+        <Button 
+          mode="contained"
+          buttonColor="#225D7C"
+          onPress={copyToClipboard}
+          style={{ width: '100%' }}
+          contentStyle={{ paddingVertical: 12 }}
+        >
+          <Text className="font-semibold" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 18, color: '#FFFFFF' }}>
+            Copy Address
+          </Text>
+        </Button>
+      </View>
     </SafeAreaView>
   );
 } 
