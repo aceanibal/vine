@@ -30,6 +30,10 @@ export interface AppState {
   error: string | null;
   lastUpdated: Date | null;
   isOnline: boolean;
+  goldPrice: {
+    history: Array<{ date: string; price: number }> | null;
+    lastHistoryFetch: Date | null;
+  };
 }
 
 // Transaction data interfaces
@@ -171,6 +175,8 @@ export interface GlobalState {
   refreshWalletData: () => Promise<void>;
   refreshGoldPrice: () => Promise<void>;
   startBackgroundGoldPriceService: () => void;
+  setGoldPriceHistory: (history: Array<{ date: string; price: number }> | null) => void;
+  refreshPriceHistory: () => Promise<void>;
 
   // ===== AUTHORIZATION ACTIONS =====
   checkWalletAuthorization: () => Promise<void>;
@@ -250,6 +256,10 @@ export const useGlobalStore = create<GlobalState>()(
         error: null,
         lastUpdated: null,
         isOnline: true,
+        goldPrice: {
+          history: null,
+          lastHistoryFetch: null,
+        },
       },
 
       // Active chains state
@@ -528,6 +538,72 @@ export const useGlobalStore = create<GlobalState>()(
         });
       },
 
+      setGoldPriceHistory: (history: Array<{ date: string; price: number }> | null) => {
+        set((state) => ({
+          appState: {
+            ...state.appState,
+            goldPrice: {
+              ...state.appState.goldPrice,
+              history,
+            },
+          },
+        }));
+      },
+
+      refreshPriceHistory: async () => {
+        const state = get();
+        const backendURL = state.backendURL;
+
+        if (!backendURL) {
+          console.log('GlobalStore: No backend URL configured for price history refresh');
+          return;
+        }
+
+        try {
+          console.log('GlobalStore: Starting gold price history refresh...');
+
+          // Import and use the gold price history service
+          // For manual refresh, we call fetchGoldPriceHistory directly (not checkAndRefreshGoldPriceHistory)
+          // The time check is only for background automatic updates
+          const { fetchGoldPriceHistory } = await import('../services/gold-price');
+          const priceHistory = await fetchGoldPriceHistory(backendURL);
+
+          console.log('GlobalStore: fetchGoldPriceHistory returned:', {
+            pointsCount: priceHistory?.length,
+          });
+
+          if (priceHistory && priceHistory.length > 0) {
+            set((state) => ({
+              appState: {
+                ...state.appState,
+                goldPrice: {
+                  history: priceHistory,
+                  lastHistoryFetch: new Date(),
+                },
+              },
+            }));
+            console.log('GlobalStore: Gold price history refresh completed successfully', {
+              pointsCount: priceHistory.length,
+              firstPoint: priceHistory[0],
+              lastPoint: priceHistory[priceHistory.length - 1],
+            });
+          } else {
+            console.log('GlobalStore: Gold price history returned empty data');
+          }
+
+        } catch (error) {
+          console.error('GlobalStore: Failed to refresh gold price history:', error);
+
+          // Update app state with error
+          set((state) => ({
+            appState: {
+              ...state.appState,
+              error: error instanceof Error ? error.message : 'Failed to refresh gold price history',
+            }
+          }));
+        }
+      },
+
       // ===== AUTHORIZATION ACTIONS =====
       checkWalletAuthorization: async () => {
         const state = get();
@@ -699,6 +775,11 @@ export const useGlobalStore = create<GlobalState>()(
         isWalletAuthorized: state.isWalletAuthorized,
         // Persist active transaction to survive reloads
         activeTransaction: state.activeTransaction,
+        // Persist gold price history
+        appState: {
+          ...state.appState,
+          goldPrice: state.appState.goldPrice,
+        },
       }),
       onRehydrateStorage: () => (state) => {
         console.log('GlobalStore: Rehydration completed');
@@ -786,5 +867,10 @@ export const useBackendURL = () => useGlobalStore((state) => state.backendURL);
 export const useTransactionData = () => useGlobalStore((state) => state.transactionData);
 export const useAllTransfers = () => useGlobalStore((state) => state.allTransfers);
 export const useTokenBalance = () => useGlobalStore((state) => state.tokenBalance);
+
+// Price history selectors
+export const usePriceHistory = () => useGlobalStore((state) => state.appState.goldPrice.history);
+export const useLastHistoryFetch = () => useGlobalStore((state) => state.appState.goldPrice.lastHistoryFetch);
+
 
 

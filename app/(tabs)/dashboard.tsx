@@ -10,7 +10,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Button } from 'react-native-paper';
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
-import { useGlobalStore, useCurrentWallet, usePredefinedToken } from '~/lib/stores/useGlobalStore';
+import { useGlobalStore, useCurrentWallet, usePredefinedToken, usePriceHistory } from '~/lib/stores/useGlobalStore';
 import { PriceChart } from '~/components/PriceChart';
 
 // Helper functions
@@ -46,12 +46,15 @@ const formatTokenBalance = (balance: string, decimals: number) => {
 const formatLastUpdated = (date: Date | null) => {
   if (!date) return '';
   
-  const diffInSeconds = Math.floor((Date.now() - date.getTime()) / 1000);
+  // Handle both Date objects and ISO strings (from persistence)
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  const diffInSeconds = Math.floor((Date.now() - dateObj.getTime()) / 1000);
   
   if (diffInSeconds < 60) return 'Just now';
   if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
   if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
-  return date.toLocaleDateString();
+  return dateObj.toLocaleDateString();
 };
 
 const formatTransactionDate = (timestamp: string | null, blockNumber?: number) => {
@@ -85,10 +88,12 @@ export default function DashboardScreen() {
   const refreshWalletData = useGlobalStore((state) => state.refreshWalletData);
   const fetchTransactionData = useGlobalStore((state) => state.fetchTransactionData);
   const refreshGoldPrice = useGlobalStore((state) => state.refreshGoldPrice);
+  const refreshPriceHistory = useGlobalStore((state) => state.refreshPriceHistory);
   const isLoading = useGlobalStore((state) => state.appState.isLoading);
   const error = useGlobalStore((state) => state.appState.error);
   const lastUpdated = useGlobalStore((state) => state.appState.lastUpdated);
   const allTransfers = useGlobalStore((state) => state.allTransfers);
+  const priceHistory = usePriceHistory();
   
   // Get recent transactions
   const recentTransactions = useMemo(() => {
@@ -124,22 +129,6 @@ export default function DashboardScreen() {
     };
   }, [predefinedToken, tokenBalance]);
   
-  // Mock price history data (7 days)
-  const priceHistory = useMemo(() => {
-    const now = Date.now();
-    const basePrice = tokenData.price || 121;
-    return [
-      { timestamp: now - 86400000 * 6, price: basePrice * 0.98 },
-      { timestamp: now - 86400000 * 5, price: basePrice * 0.99 },
-      { timestamp: now - 86400000 * 4, price: basePrice * 0.97 },
-      { timestamp: now - 86400000 * 3, price: basePrice * 1.01 },
-      { timestamp: now - 86400000 * 2, price: basePrice * 0.99 },
-      { timestamp: now - 86400000 * 1, price: basePrice * 1.02 },
-      { timestamp: now, price: basePrice },
-    ];
-  }, [tokenData.price]);
-
-  
   // Set wallet address when component mounts and fetch transaction data
   useEffect(() => {
     if (currentWallet?.address) {
@@ -150,10 +139,15 @@ export default function DashboardScreen() {
       fetchTransactionData().catch((error) => {
         console.error('Failed to fetch transaction data on mount:', error);
       });
+      
+      // Refresh price history when wallet is available
+      refreshPriceHistory().catch((error) => {
+        console.error('Failed to refresh price history on mount:', error);
+      });
     } else {
       setIsPageLoading(false);
     }
-  }, [currentWallet, fetchTransactionData]);
+  }, [currentWallet, fetchTransactionData, refreshPriceHistory]);
 
   // Active transaction UI and success handling moved to its own screen
 
@@ -172,7 +166,8 @@ export default function DashboardScreen() {
       await Promise.all([
         refreshWalletData(),
         fetchTransactionData(),
-        refreshGoldPrice()
+        refreshGoldPrice(),
+        refreshPriceHistory()
       ]);
       
       // Success haptic feedback
@@ -304,7 +299,7 @@ export default function DashboardScreen() {
               
               {/* Price Chart */}
               <View className="mt-2">
-                <PriceChart data={priceHistory} height={125} />
+                <PriceChart data={priceHistory} currentPrice={tokenData.price} height={125} />
               </View>
 
               {lastUpdated && (
