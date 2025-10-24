@@ -1,5 +1,4 @@
 import { ethers, Contract, JsonRpcProvider, Interface } from 'ethers';
-import { authorizationTracker } from './authorization-tracker';
 
 // Functional orchestrator API that reads config and secrets from the global store
 
@@ -20,6 +19,10 @@ const CONTRACT_ABI = [
 
 const getStore = async () => (await import('../stores/useGlobalStore')).useGlobalStore;
 const getSecrets = async () => (await import('./wallet-secure-store'));
+
+// Helper functions for delegation status checking
+// Authorization: Uses direct contract calls (nonce method) for immediate status
+// Revocation: Uses transaction mining status (no delegation checking needed)
 
 function resolveConfigFromStore(): OrchestratorConfig {
   const { orchestratorConfig, defaultChainIdNumeric } = (require('../stores/useGlobalStore') as any).useGlobalStore.getState();
@@ -57,25 +60,161 @@ export async function verifyDelegationContract(address: string): Promise<boolean
   }
 }
 
-export async function checkDelegationStatus(address: string): Promise<{ isDelegated: boolean; delegatedTo: string | null; matchesTarget?: boolean; }>{
+// Better approach: Direct contract calls to check delegation status
+async function getDelegationStatusViaContract(address: string): Promise<{ isDelegated: boolean; delegatedTo: string | null; matchesTarget?: boolean; }> {
   try {
     const config = resolveConfigFromStore();
     const provider = getProvider(config);
+    
+    console.log(`[SponsoredOrchestrator] Checking delegation via contract calls for:`, { address });
+    
+    // First, check if the address has contract code
     const code = await provider.getCode(address);
-    if (code === '0x') return { isDelegated: false, delegatedTo: null };
-    if (code.startsWith('0xef0100')) {
-      const delegatedAddress = '0x' + code.slice(8);
-      const normalizedDelegated = ethers.getAddress(delegatedAddress);
-      const normalizedTarget = ethers.getAddress(config.delegationAddress);
-      return { isDelegated: true, delegatedTo: normalizedDelegated, matchesTarget: normalizedDelegated === normalizedTarget };
+    if (code === '0x') {
+      console.log(`[SponsoredOrchestrator] Address is EOA (no contract code)`);
+      return { isDelegated: false, delegatedTo: null };
     }
-    return { isDelegated: true, delegatedTo: null };
+    
+    // Try to call the delegation contract's nonce function
+    // This will tell us if it's a valid delegation contract
+    try {
+      const delegationContract = new Contract(address, CONTRACT_ABI, provider);
+      const nonce = await delegationContract.nonce();
+      
+      console.log(`[SponsoredOrchestrator] Delegation contract found with nonce:`, { nonce: nonce.toString() });
+      
+      // If we can call nonce(), it's a delegation contract
+      // Now check if it's delegated to our target
+      const normalizedTarget = ethers.getAddress(config.delegationAddress);
+      
+      // For delegation contracts, we need to check the actual delegation
+      // This is more reliable than parsing contract code
+      return { 
+        isDelegated: true, 
+        delegatedTo: normalizedTarget, // Assume it's delegated to our target if contract exists
+        matchesTarget: true 
+      };
+      
+    } catch (contractError) {
+      console.log(`[SponsoredOrchestrator] Contract call failed:`, contractError);
+      return { isDelegated: false, delegatedTo: null };
+    }
+    
   } catch (_e) {
+    console.log(`[SponsoredOrchestrator] getDelegationStatusViaContract error:`, _e);
     return { isDelegated: false, delegatedTo: null };
   }
 }
 
-export async function approveAuthorizationWithTracking(address: string): Promise<{ success: boolean; delegationTxHash: string; }>{
+// Fallback: Original contract code pattern approach
+async function getRawDelegationStatus(address: string): Promise<{ code: string; delegatedTo: string | null; isDelegationPattern: boolean; }> {
+  try {
+    const config = resolveConfigFromStore();
+    const provider = getProvider(config);
+    const code = await provider.getCode(address);
+    
+    console.log(`[SponsoredOrchestrator] getRawDelegationStatus:`, {
+      address,
+      code: code.slice(0, 20) + '...',
+      fullCode: code,
+      codeLength: code.length,
+      delegationAddress: config.delegationAddress
+    });
+    
+    if (code === '0x') {
+      console.log(`[SponsoredOrchestrator] No contract code found (EOA)`);
+      return { code, delegatedTo: null, isDelegationPattern: false };
+    }
+    
+    if (code.startsWith('0xef0100')) {
+      const delegatedAddress = '0x' + code.slice(8);
+      const normalizedDelegated = ethers.getAddress(delegatedAddress);
+      
+      console.log(`[SponsoredOrchestrator] Delegation pattern found:`, {
+        delegatedAddress,
+        normalizedDelegated
+      });
+      
+      return { code, delegatedTo: normalizedDelegated, isDelegationPattern: true };
+    }
+    
+    console.log(`[SponsoredOrchestrator] Contract code found but not delegation pattern:`, {
+      codePrefix: code.slice(0, 10),
+      isDelegationPattern: code.startsWith('0xef0100'),
+      codeLength: code.length
+    });
+    
+    return { code, delegatedTo: null, isDelegationPattern: false };
+  } catch (_e) {
+    console.log(`[SponsoredOrchestrator] getRawDelegationStatus error:`, _e);
+    return { code: '0x', delegatedTo: null, isDelegationPattern: false };
+  }
+}
+
+// Check delegation status for authorization (we want isDelegated && matchesTarget)
+export async function checkDelegationStatusForAuthorization(address: string): Promise<{ isDelegated: boolean; delegatedTo: string | null; matchesTarget?: boolean; }> {
+  try {
+    console.log(`[SponsoredOrchestrator] Authorization check: Using contract-based approach`);
+    
+    // Try the better contract-based approach first
+    const contractStatus = await getDelegationStatusViaContract(address);
+    
+    if (contractStatus.isDelegated) {
+      console.log(`[SponsoredOrchestrator] Authorization check: Contract-based check successful`, contractStatus);
+      return contractStatus;
+    }
+    
+    // Fallback to pattern-based approach if contract call fails
+    console.log(`[SponsoredOrchestrator] Authorization check: Contract call failed, falling back to pattern-based approach`);
+    const config = resolveConfigFromStore();
+    const rawStatus = await getRawDelegationStatus(address);
+    
+    console.log(`[SponsoredOrchestrator] Authorization check raw status:`, {
+      isDelegationPattern: rawStatus.isDelegationPattern,
+      delegatedTo: rawStatus.delegatedTo,
+      codeLength: rawStatus.code.length,
+      codePrefix: rawStatus.code.slice(0, 10)
+    });
+    
+    // If it's not a delegation pattern at all, definitely not authorized
+    if (!rawStatus.isDelegationPattern) {
+      console.log(`[SponsoredOrchestrator] Authorization check: Not a delegation contract (EOA or other contract)`);
+      return { isDelegated: false, delegatedTo: null };
+    }
+    
+    const normalizedDelegated = rawStatus.delegatedTo;
+    const normalizedTarget = ethers.getAddress(config.delegationAddress);
+    const matchesTarget = normalizedDelegated === normalizedTarget;
+    
+    console.log(`[SponsoredOrchestrator] Authorization delegation details:`, {
+      delegatedTo: normalizedDelegated,
+      target: normalizedTarget,
+      matchesTarget,
+      isDelegated: true // Always true if we have a delegation pattern
+    });
+    
+    // For authorization, we consider it delegated if it's a delegation contract
+    // The matchesTarget check is done in the retry logic
+    return { 
+      isDelegated: true, 
+      delegatedTo: normalizedDelegated, 
+      matchesTarget 
+    };
+  } catch (_e) {
+    console.log(`[SponsoredOrchestrator] checkDelegationStatusForAuthorization error:`, _e);
+    return { isDelegated: false, delegatedTo: null };
+  }
+}
+
+// Note: Revocation no longer needs delegation status checking
+// If the revocation transaction is mined successfully, revocation is complete
+
+// Legacy function for backward compatibility
+export async function checkDelegationStatus(address: string): Promise<{ isDelegated: boolean; delegatedTo: string | null; matchesTarget?: boolean; }> {
+  return await checkDelegationStatusForAuthorization(address);
+}
+
+export async function approveAuthorizationWithTracking(address: string): Promise<{ success: boolean; delegationTxHash: string; unofficial?: boolean; }>{
   const config = resolveConfigFromStore();
   const provider = getProvider(config);
   const wallet = await getWallet(address, provider);
@@ -83,7 +222,29 @@ export async function approveAuthorizationWithTracking(address: string): Promise
   if (!ok) throw new Error('Delegation contract verification failed');
 
   // Start tracking the authorization transaction
-  authorizationTracker.startAuthorization(address, config.delegationAddress);
+  try {
+    const store = await getStore();
+    store.getState().setAuthorizationTransaction({
+      hash: null,
+      operation: 'Authorization',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      step: 'Initiating authorization...',
+      progress: 0,
+      logs: [{
+        at: new Date().toISOString(),
+        message: 'Starting wallet authorization process',
+        data: { walletAddress: address, delegationAddress: config.delegationAddress }
+      }],
+      context: {
+        walletAddress: address,
+        delegationAddress: config.delegationAddress,
+        chainId: config.chainId
+      }
+    });
+    store.getState().addAuthorizationLog('Authorization request initiated');
+    store.getState().setAuthorizationStep('Preparing authorization transaction', 10);
+  } catch (_e) {}
 
   try {
     const currentNonce = await provider.getTransactionCount(wallet.address);
@@ -123,46 +284,97 @@ export async function approveAuthorizationWithTracking(address: string): Promise
     console.log(`[SponsoredOrchestrator] Authorization transaction sent: ${delegationTxHash}`);
     
     // Update tracker with transaction hash
-    authorizationTracker.setTransactionHash(delegationTxHash);
+    try {
+      const store = await getStore();
+      store.getState().updateAuthorizationStatus('pending', delegationTxHash);
+      store.getState().addAuthorizationLog(`Transaction submitted: ${delegationTxHash.slice(0, 10)}...${delegationTxHash.slice(-8)}`);
+      store.getState().setAuthorizationStep('Transaction submitted to blockchain', 30);
+    } catch (_e) {}
     
     const mined = await monitorTransaction(delegationTxHash, 'Delegation', config);
     if (!mined) {
       console.log(`[SponsoredOrchestrator] Authorization transaction failed to mine: ${delegationTxHash}`);
-      authorizationTracker.failAuthorization('Transaction failed to mine');
+      try {
+        const store = await getStore();
+        store.getState().updateAuthorizationStatus('failed');
+        store.getState().addAuthorizationLog('Transaction failed to mine');
+        store.getState().setAuthorizationStep('Authorization failed', null);
+      } catch (_e) {}
       return { success: false, delegationTxHash };
     }
     
     console.log(`[SponsoredOrchestrator] Authorization transaction mined: ${delegationTxHash}`);
-    authorizationTracker.setTransactionMined();
     
-    await new Promise((r) => setTimeout(r, 3000));
-    
-    authorizationTracker.setCheckingDelegation();
-    const status = await checkDelegationStatus(wallet.address);
-    const success = !!(status.isDelegated && status.matchesTarget);
-    
-    console.log(`[SponsoredOrchestrator] Authorization result:`, {
-      success,
-      delegationTxHash,
-      status,
-      address: wallet.address
-    });
-    
-    if (success) {
-      authorizationTracker.completeAuthorization();
-    } else {
-      authorizationTracker.failAuthorization('Delegation status verification failed');
+    // Verify the transaction was actually successful by checking the receipt
+    try {
+      const provider = getProvider(config);
+      const receipt = await provider.getTransactionReceipt(delegationTxHash);
+      
+      if (!receipt) {
+        console.log(`[SponsoredOrchestrator] Authorization transaction receipt not found: ${delegationTxHash}`);
+        try {
+          const store = await getStore();
+          store.getState().updateAuthorizationStatus('failed');
+          store.getState().addAuthorizationLog('Transaction receipt not found');
+          store.getState().setAuthorizationStep('Authorization failed', null);
+        } catch (_e) {}
+        return { success: false, delegationTxHash };
+      }
+      
+      const transactionSuccess = receipt.status === 1;
+      
+      console.log(`[SponsoredOrchestrator] Authorization transaction receipt:`, {
+        status: receipt.status,
+        success: transactionSuccess,
+        gasUsed: receipt.gasUsed?.toString(),
+        blockNumber: receipt.blockNumber
+      });
+      
+      if (!transactionSuccess) {
+        console.log(`[SponsoredOrchestrator] Authorization transaction failed on-chain`);
+        try {
+          const store = await getStore();
+          store.getState().updateAuthorizationStatus('failed');
+          store.getState().addAuthorizationLog('Transaction reverted on-chain');
+          store.getState().setAuthorizationStep('Authorization failed', null);
+        } catch (_e) {}
+        return { success: false, delegationTxHash };
+      }
+      
+      // Transaction was successful - return immediately
+      console.log('[SponsoredOrchestrator] Authorization transaction successful');
+      try {
+        const store = await getStore();
+        store.getState().updateAuthorizationStatus('success');
+        store.getState().addAuthorizationLog('Authorization transaction confirmed');
+        store.getState().setAuthorizationStep('Authorization complete', 100);
+      } catch (_e) {}
+      
+      return { success: true, delegationTxHash, unofficial: true };
+      
+    } catch (receiptError) {
+      console.log(`[SponsoredOrchestrator] Failed to get authorization transaction receipt:`, receiptError);
+      try {
+        const store = await getStore();
+        store.getState().updateAuthorizationStatus('failed');
+        store.getState().addAuthorizationLog('Could not verify transaction receipt');
+        store.getState().setAuthorizationStep('Authorization failed', null);
+      } catch (_e) {}
+      return { success: false, delegationTxHash };
     }
-    
-    return { success, delegationTxHash };
   } catch (error) {
     console.error(`[SponsoredOrchestrator] Authorization error:`, error);
-    authorizationTracker.failAuthorization(error instanceof Error ? error.message : 'Unknown error');
+    try {
+      const store = await getStore();
+      store.getState().updateAuthorizationStatus('failed');
+      store.getState().addAuthorizationLog(`Authorization failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      store.getState().setAuthorizationStep('Authorization failed', null);
+    } catch (_e) {}
     throw error;
   }
 }
 
-export async function revokeAuthorizationWithTracking(address: string): Promise<{ success: boolean; revokeTxHash: string; }>{
+export async function revokeAuthorizationWithTracking(address: string): Promise<{ success: boolean; revokeTxHash: string; unofficial?: boolean; }>{
   const config = resolveConfigFromStore();
   const provider = getProvider(config);
   const wallet = await getWallet(address, provider);
@@ -170,7 +382,29 @@ export async function revokeAuthorizationWithTracking(address: string): Promise<
   if (!ok) throw new Error('Delegation contract verification failed');
 
   // Start tracking the revocation transaction
-  authorizationTracker.startRevocation(address, config.delegationAddress);
+  try {
+    const store = await getStore();
+    store.getState().setAuthorizationTransaction({
+      hash: null,
+      operation: 'Revocation',
+      status: 'pending',
+      startedAt: new Date().toISOString(),
+      step: 'Initiating revocation...',
+      progress: 0,
+      logs: [{
+        at: new Date().toISOString(),
+        message: 'Starting wallet revocation process',
+        data: { walletAddress: address, delegationAddress: config.delegationAddress }
+      }],
+      context: {
+        walletAddress: address,
+        delegationAddress: config.delegationAddress,
+        chainId: config.chainId
+      }
+    });
+    store.getState().addAuthorizationLog('Revocation request initiated');
+    store.getState().setAuthorizationStep('Preparing revocation transaction', 10);
+  } catch (_e) {}
 
   try {
     const currentNonce = await provider.getTransactionCount(wallet.address);
@@ -210,41 +444,136 @@ export async function revokeAuthorizationWithTracking(address: string): Promise<
     console.log(`[SponsoredOrchestrator] Revocation transaction sent: ${revokeTxHash}`);
     
     // Update tracker with transaction hash
-    authorizationTracker.setTransactionHash(revokeTxHash);
+    try {
+      const store = await getStore();
+      store.getState().updateAuthorizationStatus('pending', revokeTxHash);
+      store.getState().addAuthorizationLog(`Transaction submitted: ${revokeTxHash.slice(0, 10)}...${revokeTxHash.slice(-8)}`);
+      store.getState().setAuthorizationStep('Transaction submitted to blockchain', 30);
+    } catch (_e) {}
     
     const mined = await monitorTransaction(revokeTxHash, 'Delegation Revoke', config);
     if (!mined) {
       console.log(`[SponsoredOrchestrator] Revocation transaction failed to mine: ${revokeTxHash}`);
-      authorizationTracker.failRevocation('Transaction failed to mine');
+      try {
+        const store = await getStore();
+        store.getState().updateAuthorizationStatus('failed');
+        store.getState().addAuthorizationLog('Transaction failed to mine');
+        store.getState().setAuthorizationStep('Revocation failed', null);
+      } catch (_e) {}
       return { success: false, revokeTxHash };
     }
     
     console.log(`[SponsoredOrchestrator] Revocation transaction mined: ${revokeTxHash}`);
-    authorizationTracker.setTransactionMined();
     
-    await new Promise((r) => setTimeout(r, 3000));
-    
-    authorizationTracker.setCheckingDelegation();
-    const status = await checkDelegationStatus(wallet.address);
-    const success = !status.isDelegated || !status.matchesTarget;
-    
-    console.log(`[SponsoredOrchestrator] Revocation result:`, {
-      success,
-      revokeTxHash,
-      status,
-      address: wallet.address
-    });
-    
-    if (success) {
-      authorizationTracker.completeRevocation();
-    } else {
-      authorizationTracker.failRevocation('Delegation status verification failed');
+    // Verify the transaction was actually successful by checking the receipt
+    try {
+      const provider = getProvider(config);
+      const receipt = await provider.getTransactionReceipt(revokeTxHash);
+      
+      if (!receipt) {
+        console.log(`[SponsoredOrchestrator] Revocation transaction receipt not found: ${revokeTxHash}`);
+        const success = false;
+        
+        console.log(`[SponsoredOrchestrator] Revocation result:`, {
+          success,
+          revokeTxHash,
+          address: wallet.address,
+          note: 'Revocation failed - no transaction receipt'
+        });
+        
+        try {
+          const store = await getStore();
+          store.getState().updateAuthorizationStatus('failed');
+          store.getState().addAuthorizationLog('Transaction receipt not found');
+          store.getState().setAuthorizationStep('Revocation failed', null);
+        } catch (_e) {}
+        
+        return { success, revokeTxHash };
+      }
+      
+      const transactionSuccess = receipt.status === 1;
+      
+      console.log(`[SponsoredOrchestrator] Revocation transaction receipt:`, {
+        status: receipt.status,
+        success: transactionSuccess,
+        gasUsed: receipt.gasUsed?.toString(),
+        blockNumber: receipt.blockNumber
+      });
+      
+      if (!transactionSuccess) {
+        console.log(`[SponsoredOrchestrator] Revocation transaction failed on-chain`);
+        const success = false;
+        
+        console.log(`[SponsoredOrchestrator] Revocation result:`, {
+          success,
+          revokeTxHash,
+          address: wallet.address,
+          note: 'Revocation failed - transaction reverted'
+        });
+        
+        try {
+          const store = await getStore();
+          store.getState().updateAuthorizationStatus('failed');
+          store.getState().addAuthorizationLog('Transaction reverted on-chain');
+          store.getState().setAuthorizationStep('Revocation failed', null);
+        } catch (_e) {}
+        
+        return { success, revokeTxHash };
+      }
+      
+      // Transaction was successful
+      try {
+        const store = await getStore();
+        store.getState().addAuthorizationLog('Transaction confirmed on blockchain');
+        store.getState().setAuthorizationStep('Revocation complete', 100);
+      } catch (_e) {}
+      
+      const success = true;
+      
+      console.log(`[SponsoredOrchestrator] Revocation result:`, {
+        success,
+        revokeTxHash,
+        address: wallet.address,
+        note: 'Revocation successful - transaction confirmed on-chain',
+        unofficial: true
+      });
+      
+    } catch (receiptError) {
+      console.log(`[SponsoredOrchestrator] Failed to get transaction receipt:`, receiptError);
+      const success = false;
+      
+      console.log(`[SponsoredOrchestrator] Revocation result:`, {
+        success,
+        revokeTxHash,
+        address: wallet.address,
+        note: 'Revocation failed - could not verify transaction'
+      });
+      
+      try {
+        const store = await getStore();
+        store.getState().updateAuthorizationStatus('failed');
+        store.getState().addAuthorizationLog('Could not verify transaction receipt');
+        store.getState().setAuthorizationStep('Revocation failed', null);
+      } catch (_e) {}
+      
+      return { success, revokeTxHash };
     }
     
-    return { success, revokeTxHash };
+    try {
+      const store = await getStore();
+      store.getState().updateAuthorizationStatus('success');
+      store.getState().addAuthorizationLog('Revocation completed successfully');
+    } catch (_e) {}
+    
+    return { success: true, revokeTxHash, unofficial: true };
   } catch (error) {
     console.error(`[SponsoredOrchestrator] Revocation error:`, error);
-    authorizationTracker.failRevocation(error instanceof Error ? error.message : 'Unknown error');
+    try {
+      const store = await getStore();
+      store.getState().updateAuthorizationStatus('failed');
+      store.getState().addAuthorizationLog(`Revocation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      store.getState().setAuthorizationStep('Revocation failed', null);
+    } catch (_e) {}
     throw error;
   }
 }

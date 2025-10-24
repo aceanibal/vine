@@ -17,6 +17,8 @@ export default function AmountScreen() {
   const predefinedToken = usePredefinedToken();
   const tokenBalance = useTokenBalance();
   const checkWalletAuthorization = useGlobalStore((s) => s.checkWalletAuthorization);
+  const isWalletAuthorized = useGlobalStore((s) => s.isWalletAuthorized);
+  const unofficialAuthorizationStatus = useGlobalStore((s) => s.unofficialAuthorizationStatus);
   
   const [amount, setAmount] = useState('');
   const [inputMode, setInputMode] = useState<'token' | 'usd'>('token');
@@ -78,7 +80,8 @@ export default function AmountScreen() {
           if (currentWallet?.address) {
             console.log('[Send Amount] Checking wallet authorization...');
             await checkWalletAuthorization();
-            if (active && !useGlobalStore.getState().isWalletAuthorized) {
+            const effectiveAuthStatus = unofficialAuthorizationStatus ?? isWalletAuthorized;
+            if (active && !effectiveAuthStatus) {
               console.log('[Send Amount] Wallet not authorized, redirecting to authorize screen');
               router.replace('/send/authorize');
             }

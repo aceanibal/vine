@@ -84,13 +84,18 @@ export class BackgroundGoldPriceService {
       const state = useGlobalStore.getState();
       const backendURL = state.backendURL;
       const lastUpdated = state.appState.lastUpdated;
+      
+      // Convert string to Date if needed (happens after rehydration from storage)
+      const lastUpdatedDate = lastUpdated 
+        ? (lastUpdated instanceof Date ? lastUpdated : new Date(lastUpdated))
+        : null;
 
       if (!backendURL) {
         console.log('BackgroundGoldPriceService: No backend URL configured');
         return;
       }
 
-      const wasUpdated = await checkAndRefreshGoldPrice(backendURL, lastUpdated);
+      const wasUpdated = await checkAndRefreshGoldPrice(backendURL, lastUpdatedDate);
       
       if (wasUpdated) {
         console.log('BackgroundGoldPriceService: Gold price updated successfully');

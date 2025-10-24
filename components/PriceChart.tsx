@@ -2,6 +2,7 @@ import { View, Text as RNText } from 'react-native';
 import { CartesianChart, Line, useChartPressState } from 'victory-native';
 import { Circle, useFont } from '@shopify/react-native-skia';
 import { useColorScheme } from '~/lib/useColorScheme';
+import { useEffect, useState } from 'react';
 
 interface PriceDataPoint {
   timestamp?: number;
@@ -18,6 +19,34 @@ interface PriceChartProps {
 export function PriceChart({ data, currentPrice, height = 100 }: PriceChartProps) {
   const { colors } = useColorScheme();
   const { state, isActive } = useChartPressState({ x: 0, y: { price: 0 } });
+  
+  // Manual state for tooltip
+  const [tooltipData, setTooltipData] = useState<{ price: number; timestamp: number } | null>(null);
+
+  // Handle tooltip updates without accessing shared values during render
+  useEffect(() => {
+    if (isActive && state.x && state.y.price) {
+      // Use a timeout to avoid accessing shared values during render
+      const timeoutId = setTimeout(() => {
+        try {
+          // Access the values in a non-render context
+          const priceValue = (state.y.price as any)?.value;
+          const timestampValue = (state.x as any)?.value;
+          
+          if (typeof priceValue === 'number' && typeof timestampValue === 'number') {
+            setTooltipData({ price: priceValue, timestamp: timestampValue });
+            console.log('Updated tooltip data:', { price: priceValue, timestamp: timestampValue });
+          }
+        } catch (error) {
+          console.log('Error accessing shared values:', error);
+        }
+      }, 0);
+      
+      return () => clearTimeout(timeoutId);
+    } else {
+      setTooltipData(null);
+    }
+  }, [isActive, state.x, state.y.price]);
 
   // Handle empty or null data
   if (!data || data.length === 0) {
@@ -80,7 +109,7 @@ export function PriceChart({ data, currentPrice, height = 100 }: PriceChartProps
     }} 
     className="rounded-xl bg-blue-green/2">
       {/* Tooltip Display */}
-      {(state.isActive as any)?.value && (
+      {tooltipData && (
         <View style={{
           position: 'absolute',
           top: 0,
@@ -94,13 +123,7 @@ export function PriceChart({ data, currentPrice, height = 100 }: PriceChartProps
             fontSize: 14,
             fontWeight: '600',
           }}>
-            {(() => {
-              const priceValue = (state.y.price as any)?.value?.value;
-              if (typeof priceValue === 'number') {
-                return `$${priceValue.toFixed(2)}`;
-              }
-              return '$0.00';
-            })()}
+            {tooltipData ? `$${tooltipData.price.toFixed(2)}` : '$0.00'}
           </RNText>
           <RNText style={{
             color: '#225D7C',
@@ -108,13 +131,7 @@ export function PriceChart({ data, currentPrice, height = 100 }: PriceChartProps
             marginTop: 2,
             opacity: 0.9,
           }}>
-            {(() => {
-              const timestamp = (state.x as any)?.value?.value;
-              if (typeof timestamp === 'number' && timestamp > 0) {
-                return new Date(timestamp).toLocaleDateString();
-              }
-              return 'N/A';
-            })()}
+            {tooltipData ? new Date(tooltipData.timestamp).toLocaleDateString() : 'N/A'}
           </RNText>
         </View>
       )}

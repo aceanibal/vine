@@ -105,6 +105,8 @@ export interface GlobalState {
   // ===== AUTHORIZATION STATE =====
   authorizationStatus: AuthorizationStatus | null;
   isWalletAuthorized: boolean;
+  unofficialAuthorizationStatus: boolean | null;
+  authorizationPending: boolean;
 
   // ===== ACTIVE TRANSACTION STATE =====
   activeTransaction: {
@@ -121,6 +123,23 @@ export interface GlobalState {
       tokenAddress?: string;
       toAddress?: string;
       amount?: string;
+    } | null;
+  };
+
+  // ===== AUTHORIZATION TRANSACTION STATE =====
+  authorizationTransaction: {
+    hash: string | null;
+    operation: 'Authorization' | 'Revocation' | null;
+    status: 'idle' | 'pending' | 'success' | 'failed';
+    startedAt: string | null;
+    completedAt: string | null;
+    step?: string | null;
+    progress?: number | null;
+    logs?: { at: string; message: string; data?: any }[];
+    context?: {
+      walletAddress?: string;
+      delegationAddress?: string;
+      chainId?: number;
     } | null;
   };
 
@@ -190,6 +209,18 @@ export interface GlobalState {
   setActiveTransactionStep: (step: string, progress?: number | null) => void;
   setActiveTransactionContext: (ctx: Partial<GlobalState['activeTransaction']['context']>) => void;
   clearActiveTransaction: () => void;
+
+  // ===== AUTHORIZATION TRANSACTION ACTIONS =====
+  setAuthorizationTransaction: (tx: Partial<GlobalState['authorizationTransaction']>) => void;
+  updateAuthorizationStatus: (status: GlobalState['authorizationTransaction']['status'], hash?: string | null) => void;
+  addAuthorizationLog: (message: string, data?: any) => void;
+  setAuthorizationStep: (step: string, progress?: number | null) => void;
+  setAuthorizationContext: (ctx: Partial<GlobalState['authorizationTransaction']['context']>) => void;
+  clearAuthorizationTransaction: () => void;
+  
+  // ===== UNOFFICIAL AUTHORIZATION ACTIONS =====
+  setUnofficialAuthorization: (status: boolean) => void;
+  clearUnofficialAuthorization: () => void;
 }
 
 
@@ -209,9 +240,24 @@ export const useGlobalStore = create<GlobalState>()(
       // Authorization state
       authorizationStatus: null,
       isWalletAuthorized: false,
+      unofficialAuthorizationStatus: null,
+      authorizationPending: false,
 
       // Active transaction default
       activeTransaction: {
+        hash: null,
+        operation: null,
+        status: 'idle',
+        startedAt: null,
+        completedAt: null,
+        step: null,
+        progress: null,
+        logs: [],
+        context: null,
+      },
+
+      // Authorization transaction default
+      authorizationTransaction: {
         hash: null,
         operation: null,
         status: 'idle',
@@ -626,9 +672,20 @@ export const useGlobalStore = create<GlobalState>()(
           
           // Update authorization snapshot
           const isAuthorized = !!(status.isDelegated && status.matchesTarget);
+          const state = get();
+          const unofficial = state.unofficialAuthorizationStatus;
+          
+          // Check if unofficial and actual status match
+          const pending = unofficial !== null && unofficial !== isAuthorized;
+          
+          // Clear unofficial status if it matches actual status
+          const shouldClearUnofficial = unofficial !== null && unofficial === isAuthorized;
+          
           set((s) => ({
             authorizationStatus: status,
             isWalletAuthorized: isAuthorized,
+            authorizationPending: pending,
+            unofficialAuthorizationStatus: shouldClearUnofficial ? null : s.unofficialAuthorizationStatus,
             appState: { 
               ...s.appState, 
               isLoading: false,
@@ -729,6 +786,81 @@ export const useGlobalStore = create<GlobalState>()(
         });
       },
 
+      // ===== AUTHORIZATION TRANSACTION ACTIONS =====
+      setAuthorizationTransaction: (tx) => {
+        set((s) => ({
+          authorizationTransaction: {
+            hash: tx.hash ?? s.authorizationTransaction.hash,
+            operation: (tx.operation as any) ?? s.authorizationTransaction.operation,
+            status: (tx.status as any) ?? s.authorizationTransaction.status,
+            startedAt: tx.startedAt ?? s.authorizationTransaction.startedAt,
+            completedAt: tx.completedAt ?? s.authorizationTransaction.completedAt,
+            step: (tx as any).step ?? s.authorizationTransaction.step,
+            progress: (tx as any).progress ?? s.authorizationTransaction.progress,
+            logs: (tx as any).logs ?? s.authorizationTransaction.logs,
+            context: (tx as any).context ?? s.authorizationTransaction.context,
+          },
+        }));
+      },
+      updateAuthorizationStatus: (status, hash) => {
+        set((s) => ({
+          authorizationTransaction: {
+            ...s.authorizationTransaction,
+            status,
+            hash: typeof hash !== 'undefined' ? hash : s.authorizationTransaction.hash,
+            completedAt: status === 'success' || status === 'failed' ? new Date().toISOString() : s.authorizationTransaction.completedAt,
+          },
+        }));
+      },
+      addAuthorizationLog: (message: string, data?: any) => {
+        set((s) => ({
+          authorizationTransaction: {
+            ...s.authorizationTransaction,
+            logs: [...(s.authorizationTransaction.logs || []), { at: new Date().toISOString(), message, data }],
+          },
+        }));
+      },
+      setAuthorizationStep: (step: string, progress?: number | null) => {
+        set((s) => ({
+          authorizationTransaction: {
+            ...s.authorizationTransaction,
+            step,
+            progress: typeof progress === 'number' ? progress : s.authorizationTransaction.progress ?? null,
+          },
+        }));
+      },
+      setAuthorizationContext: (ctx: Partial<GlobalState['authorizationTransaction']['context']>) => {
+        set((s) => ({
+          authorizationTransaction: {
+            ...s.authorizationTransaction,
+            context: { ...(s.authorizationTransaction.context || {}), ...ctx },
+          },
+        }));
+      },
+      clearAuthorizationTransaction: () => {
+        set({
+          authorizationTransaction: {
+            hash: null,
+            operation: null,
+            status: 'idle',
+            startedAt: null,
+            completedAt: null,
+            step: null,
+            progress: null,
+            logs: [],
+            context: null,
+          },
+        });
+      },
+
+      // Unofficial authorization methods
+      setUnofficialAuthorization: (status: boolean) => {
+        set({ unofficialAuthorizationStatus: status });
+      },
+      clearUnofficialAuthorization: () => {
+        set({ unofficialAuthorizationStatus: null, authorizationPending: false });
+      },
+
     }),
     {
       name: 'global-store',
@@ -775,6 +907,8 @@ export const useGlobalStore = create<GlobalState>()(
         isWalletAuthorized: state.isWalletAuthorized,
         // Persist active transaction to survive reloads
         activeTransaction: state.activeTransaction,
+        // Persist authorization transaction to survive reloads
+        authorizationTransaction: state.authorizationTransaction,
         // Persist gold price history
         appState: {
           ...state.appState,

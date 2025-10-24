@@ -9,31 +9,28 @@ import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore, useCurrentWallet } from '~/lib/stores/useGlobalStore';
 import { approveAuthorizationWithTracking } from '~/lib/services/sponsored-orchestrator';
-import { authorizationTracker } from '~/lib/services/authorization-tracker';
 
 export default function AuthorizeScreen() {
   const { colors } = useColorScheme();
   const currentWallet = useCurrentWallet();
   const [isLoading, setIsLoading] = useState(false);
-  const [transactionHash, setTransactionHash] = useState<string | null>(null);
   const checkWalletAuthorization = useGlobalStore((s) => s.checkWalletAuthorization);
+  const setUnofficialAuthorization = useGlobalStore((s) => s.setUnofficialAuthorization);
 
   const handleAuthorize = async () => {
     if (!currentWallet?.address) return;
     setIsLoading(true);
-    setTransactionHash(null);
     try {
       console.log('[Authorize] Starting authorization...');
       const res = await approveAuthorizationWithTracking(currentWallet.address);
       
-      // Get transaction hash from tracker
-      const txHash = authorizationTracker.getCurrentTransactionHash();
-      if (txHash) {
-        setTransactionHash(txHash);
-        console.log('[Authorize] Transaction hash:', txHash);
-      }
-      
-      if (res.success) {
+      if (res.success && res.unofficial) {
+        // Set unofficial status and navigate immediately
+        setUnofficialAuthorization(true);
+        console.log('[Authorize] Navigation to send screen');
+        router.replace('/(tabs)/send');
+        return;
+      } else if (res.success) {
         console.log('[Authorize] Authorization successful, checking status...');
         // Use single source of truth to update authorization status
         await checkWalletAuthorization();
@@ -137,20 +134,6 @@ export default function AuthorizeScreen() {
               </Text>
             </View>
 
-            {/* Transaction Hash Display */}
-            {transactionHash && (
-              <View className="gap-2 rounded-xl bg-lapis-lazuli/10 p-4">
-                <Text className="text-base font-semibold text-lapis-lazuli/80">Transaction Hash</Text>
-                <Text 
-                  className="text-lapis-lazuli font-mono" 
-                  style={{ fontSize: 14, lineHeight: 20 }}
-                  numberOfLines={2}
-                  adjustsFontSizeToFit
-                >
-                  {transactionHash.slice(0, 2)} {transactionHash.slice(2, 12)}...{transactionHash.slice(-8)}
-                </Text>
-              </View>
-            )}
           </View>
         </ScrollView>
 

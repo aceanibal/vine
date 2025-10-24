@@ -23,7 +23,10 @@ export default function SettingsScreen() {
   const clearWallets = useGlobalStore((state) => state.clearWallets);
   const authorizationStatus = useGlobalStore((state) => state.authorizationStatus);
   const isWalletAuthorized = useGlobalStore((state) => state.isWalletAuthorized);
+  const unofficialAuthorizationStatus = useGlobalStore((state) => state.unofficialAuthorizationStatus);
+  const authorizationPending = useGlobalStore((state) => state.authorizationPending);
   const checkWalletAuthorization = useGlobalStore((state) => state.checkWalletAuthorization);
+  const setUnofficialAuthorization = useGlobalStore((state) => state.setUnofficialAuthorization);
   const orchestratorConfig = useGlobalStore((state) => state.orchestratorConfig);
   const isStoreLoading = useGlobalStore((state) => state.appState.isLoading);  
   const [walletAddress, setWalletAddress] = useState<string | null>(null);
@@ -46,10 +49,24 @@ export default function SettingsScreen() {
   });
   const [showRecoveryModal, setShowRecoveryModal] = useState(false);
   const [recoveryMnemonic, setRecoveryMnemonic] = useState<string>('');
+  const [pendingTxHash, setPendingTxHash] = useState<string | null>(null);
 
   useEffect(() => {
     loadData();
   }, []);
+
+  useEffect(() => {
+    if (currentWallet?.address) {
+      checkWalletAuthorization();
+    }
+  }, [currentWallet?.address, checkWalletAuthorization]);
+
+  // Clear pending transaction hash when authorization status is reconciled
+  useEffect(() => {
+    if (!authorizationPending && !(unofficialAuthorizationStatus !== null && unofficialAuthorizationStatus !== isWalletAuthorized) && pendingTxHash) {
+      setPendingTxHash(null);
+    }
+  }, [authorizationPending, unofficialAuthorizationStatus, isWalletAuthorized, pendingTxHash]);
 
   const loadData = async () => {
     try {
@@ -118,10 +135,13 @@ export default function SettingsScreen() {
           console.log('[Settings] Revoke pressed');
           const res = await revokeAuthorizationWithTracking(currentWallet.address);
           console.log('[Settings] Revoke result:', res);
-          // Use single source of truth to update status
-          await checkWalletAuthorization();
+          if (res.success && res.unofficial) {
+            // Set unofficial status immediately
+            setUnofficialAuthorization(false);
+            setPendingTxHash(res.revokeTxHash);
+          }
           setToastConfig({
-            message: res.success ? `Authorization revoked${res.revokeTxHash ? ` (tx: ${res.revokeTxHash.slice(0,10)}...${res.revokeTxHash.slice(-8)})` : ''}` : 'Failed to revoke authorization',
+            message: res.success ? 'Authorization revoked successfully' : 'Failed to revoke authorization',
             type: res.success ? 'success' : 'error',
           });
           setShowToast(true);
@@ -312,21 +332,33 @@ export default function SettingsScreen() {
               </TouchableOpacity>
             </View>
             <View className="gap-4">
-              <View className={`gap-4 rounded-xl p-6 ${isStoreLoading ? 'bg-cambridge-blue/10' : (isWalletAuthorized ? 'bg-cambridge-blue/10' : 'bg-boston-red/10')}`}>
+              <View className={`gap-4 rounded-xl p-6 ${isStoreLoading ? 'bg-cambridge-blue/10' : ((unofficialAuthorizationStatus ?? isWalletAuthorized) ? 'bg-cambridge-blue/10' : 'bg-boston-red/10')}`}>
                 <View className="items-center gap-2">
                   <MaterialIcons 
-                    name={isStoreLoading ? 'sync' : (isWalletAuthorized ? 'check-circle' : 'cancel')} 
+                    name={isStoreLoading ? 'sync' : ((unofficialAuthorizationStatus ?? isWalletAuthorized) ? 'check-circle' : 'cancel')} 
                     size={28} 
-                    color={isStoreLoading ? '#9CA3AF' : (isWalletAuthorized ? '#7FAFA1' : '#FC7E7E')} 
+                    color={isStoreLoading ? '#9CA3AF' : ((unofficialAuthorizationStatus ?? isWalletAuthorized) ? '#7FAFA1' : '#FC7E7E')} 
                   />
                   <Text 
-                    className={`font-semibold ${isStoreLoading ? 'text-gray-500' : (isWalletAuthorized ? 'text-cambridge-blue' : 'text-boston-red')}`}
+                    className={`font-semibold ${isStoreLoading ? 'text-gray-500' : ((unofficialAuthorizationStatus ?? isWalletAuthorized) ? 'text-cambridge-blue' : 'text-boston-red')}`}
                     numberOfLines={1}
                     adjustsFontSizeToFit
                     style={{ fontSize: 20 }}
                   >
-                    {isStoreLoading ? 'Loading...' : (isWalletAuthorized ? 'Authorized' : 'Not Authorized')}
+                    {isStoreLoading ? 'Loading...' : ((unofficialAuthorizationStatus ?? isWalletAuthorized) ? 'Authorized' : 'Not Authorized')}
                   </Text>
+                  {(authorizationPending || pendingTxHash) && (
+                    <View className="items-center gap-1">
+                      <Text className="text-xs text-lapis-lazuli text-center">
+                        Waiting for validator confirmation
+                      </Text>
+                      {pendingTxHash && (
+                        <Text className="text-xs text-lapis-lazuli/60 text-center font-mono">
+                          TX: {pendingTxHash.slice(0, 10)}...{pendingTxHash.slice(-8)}
+                        </Text>
+                      )}
+                    </View>
+                  )}
                 </View>
                 <View className="gap-2">
                   <View className="flex-row items-start gap-2">
@@ -363,7 +395,7 @@ export default function SettingsScreen() {
           {/* Authorization Actions Section */}
           <View className="gap-2 rounded-xl px-6">
             {/* Authorize (only when not authorized) */}
-            {!isWalletAuthorized && (
+            {!(unofficialAuthorizationStatus ?? isWalletAuthorized) && (
               <>
                 <Text className="text-xs text-center text-lapis-lazuli">
                   Authorize your wallet to enable sponsored gas fees for transactions.
@@ -377,10 +409,13 @@ export default function SettingsScreen() {
                     try {
                       console.log('[Settings] Starting authorization...');
                       const res = await approveAuthorizationWithTracking(currentWallet.address);
-                      // Use single source of truth to update status
-                      await checkWalletAuthorization();
+                      if (res.success && res.unofficial) {
+                        // Set unofficial status immediately
+                        setUnofficialAuthorization(true);
+                        setPendingTxHash(res.delegationTxHash);
+                      }
                       setToastConfig({
-                        message: res.success ? `Authorization successful${res.delegationTxHash ? ` (tx: ${res.delegationTxHash.slice(0,10)}...${res.delegationTxHash.slice(-8)})` : ''}` : 'Authorization failed',
+                        message: res.success ? 'Authorization completed successfully' : 'Authorization failed',
                         type: res.success ? 'success' : 'error',
                       });
                       setShowToast(true);
@@ -413,7 +448,7 @@ export default function SettingsScreen() {
             )}
             
             {/* Revoke Authorization (only when authorized) */}
-            {isWalletAuthorized && (
+            {(unofficialAuthorizationStatus ?? isWalletAuthorized) && (
               <>
                 <Text className="text-xs text-center text-lapis-lazuli">
                   This will revoke your wallet authorization and prevent us from sponsoring your gas fees for future transactions.
