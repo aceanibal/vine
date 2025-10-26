@@ -15,20 +15,17 @@ export default function WelcomeConsentScreen() {
   const { colors } = useColorScheme();
   const currentWallet = useCurrentWallet();
   const isWalletCreated = useIsWalletCreated();
-  const _hasHydrated = useGlobalStore((state) => state._hasHydrated);
   const [isCheckingWallet, setIsCheckingWallet] = useState(true);
   
   useEffect(() => {
-    // Only check wallet after store is hydrated
-    if (_hasHydrated) {
-      const timer = setTimeout(async () => {
-        await checkWalletExists();
-        setIsCheckingWallet(false);
-      }, 100);
+    // Check wallet immediately since we no longer use hydration
+    const timer = setTimeout(async () => {
+      await checkWalletExists();
+      setIsCheckingWallet(false);
+    }, 100);
 
-      return () => clearTimeout(timer);
-    }
-  }, [_hasHydrated, currentWallet, isWalletCreated]);
+    return () => clearTimeout(timer);
+  }, [currentWallet, isWalletCreated]);
 
   const checkWalletExists = async () => {
     const hasWallet = !!(currentWallet && isWalletCreated);
@@ -54,8 +51,8 @@ export default function WelcomeConsentScreen() {
     router.replace('/(auth)/import-wallet' as any);
   };
 
-  // Show loading state while checking wallet or until store is hydrated
-  if (isCheckingWallet || !_hasHydrated) {
+  // Show loading state while checking wallet
+  if (isCheckingWallet) {
     return (
       <SafeAreaView className="flex-1">
         <View className="flex-1 items-center justify-center">

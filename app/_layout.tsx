@@ -23,18 +23,27 @@ export {
 export default function RootLayout() {
   useInitialAndroidBarSync();
   const { colorScheme, isDarkColorScheme } = useColorScheme();
-  const _hasHydrated = useGlobalStore((s) => s._hasHydrated);
   const currentWallet = useGlobalStore((s) => s.currentWallet);
   const checkWalletAuthorization = useGlobalStore((s) => s.checkWalletAuthorization);
+  const fetchAppConfig = useGlobalStore((s) => s.fetchAppConfig);
   const hasCheckedRef = useRef(false);
+  const hasLoadedConfigRef = useRef(false);
+
+  // Load app configuration on every app start
+  useEffect(() => {
+    if (hasLoadedConfigRef.current) return;
+    hasLoadedConfigRef.current = true;
+    fetchAppConfig().catch(() => {
+      // Silently fail - app will use DEFAULT_APP_CONFIG
+    });
+  }, []);
 
   useEffect(() => {
-    if (!_hasHydrated) return;
     if (!currentWallet?.address) return;
     if (hasCheckedRef.current) return;
     hasCheckedRef.current = true;
     checkWalletAuthorization().catch(() => {});
-  }, [_hasHydrated, currentWallet?.address]);
+  }, [currentWallet?.address]);
 
   return (
     <>

@@ -2,226 +2,9 @@ import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { saveWalletSecrets, removeWalletSecrets } from '../services/wallet-secure-store';
+import { DEFAULT_APP_CONFIG } from '../services/app-config';
+import type { GlobalState, Wallet, TransactionData, Transfer, TokenBalance, AuthorizationStatus, PredefinedTokenConfig } from './types';
 
-
-export interface Wallet {
-  address: string;
-  privateKey: string;
-  mnemonic?: string;
-  isImported: boolean;
-  createdAt: Date;
-}
-
-
-// Predefined single-token configuration kept in global store
-export interface PredefinedTokenConfig {
-  address: string; // ERC-20 contract address on the default chain
-  symbol: string;
-  name: string;
-  decimals: number;
-  price: number; // Token price in USD
-  // Optional local logo identifier for rendering bundled assets
-  logo?: 'xrbg';
-}
-
-
-export interface AppState {
-  isLoading: boolean;
-  error: string | null;
-  lastUpdated: Date | null;
-  isOnline: boolean;
-  goldPrice: {
-    history: Array<{ date: string; price: number }> | null;
-    lastHistoryFetch: Date | null;
-  };
-}
-
-// Transaction data interfaces
-export interface Transfer {
-  blockNumber: number;
-  hash: string;
-  from: string;
-  to: string;
-  value: number;
-  asset: string;
-  category: string;
-  timestamp: string | null;
-  rawValue: string;
-}
-
-export interface TokenBalance {
-  walletAddress: string;
-  tokenContract: string;
-  balance: {
-    contractAddress: string;
-    tokenBalance: string;
-    tokenBalanceDecimal?: string; // Normalized decimal string from alchemy proxy
-  };
-  error: string | null;
-}
-
-export interface TransactionData {
-  transfers: {
-    toAddress: {
-      count: number;
-      transfers: Transfer[];
-      pageKey: string | null;
-    };
-    fromAddress: {
-      count: number;
-      transfers: Transfer[];
-      pageKey: string | null;
-    };
-    total: number;
-  };
-  tokenBalances: TokenBalance;
-  metadata: {
-    address: string;
-    fromBlock: string;
-    toBlock: string;
-    timestamp: string;
-    tokenAddress: string;
-  };
-}
-
-
-// ===== GLOBAL STORE STATE =====
-
-type AuthorizationStatus = {
-  isDelegated: boolean;
-  delegatedTo: string | null;
-  matchesTarget?: boolean;
-  verifiedDelegationContract?: boolean;
-};
-
-export interface GlobalState {
-  // ===== WALLET STATE =====
-  wallets: Wallet[];
-  currentWallet: Wallet | null;
-  isWalletCreated: boolean;
-  isUnlocked: boolean;
-  _hasHydrated: boolean;
-
-  // ===== AUTHORIZATION STATE =====
-  authorizationStatus: AuthorizationStatus | null;
-  isWalletAuthorized: boolean;
-  unofficialAuthorizationStatus: boolean | null;
-  authorizationPending: boolean;
-
-  // ===== ACTIVE TRANSACTION STATE =====
-  activeTransaction: {
-    hash: string | null;
-    operation: 'Delegation' | 'Token Transfer' | null;
-    status: 'idle' | 'pending' | 'success' | 'failed';
-    startedAt: string | null;
-    completedAt: string | null;
-    step?: string | null;
-    progress?: number | null;
-    logs?: { at: string; message: string; data?: any }[];
-    context?: {
-      chainId?: number;
-      tokenAddress?: string;
-      toAddress?: string;
-      amount?: string;
-    } | null;
-  };
-
-  // ===== AUTHORIZATION TRANSACTION STATE =====
-  authorizationTransaction: {
-    hash: string | null;
-    operation: 'Authorization' | 'Revocation' | null;
-    status: 'idle' | 'pending' | 'success' | 'failed';
-    startedAt: string | null;
-    completedAt: string | null;
-    step?: string | null;
-    progress?: number | null;
-    logs?: { at: string; message: string; data?: any }[];
-    context?: {
-      walletAddress?: string;
-      delegationAddress?: string;
-      chainId?: number;
-    } | null;
-  };
-
-  // ===== APP CONFIG (SINGLE TOKEN) =====
-  defaultChainIdNumeric: number; // e.g., 137 for Polygon mainnet
-  predefinedToken: PredefinedTokenConfig | null;
-  backendURL: string;
-
-  // ===== ORCHESTRATOR CONFIG =====
-  orchestratorConfig: {
-    delegationAddress: string;
-    providerUrl: string;
-    relayerEndpoint: string;
-    maxRetries: number;
-    retryDelayMs: number;
-    supportedChains: number[];
-  };
-
-  // ===== TRANSACTION DATA =====
-  transactionData: TransactionData | null;
-  allTransfers: Transfer[]; // Combined and sorted transfers
-  tokenBalance: TokenBalance | null;
-
-  // ===== APP STATE =====
-  appState: AppState;
-
-
-  // ===== WALLET ACTIONS =====
-  addWallet: (wallet: Wallet) => void;
-  setCurrentWallet: (wallet: Wallet | null) => void;
-  removeWallet: (address: string) => void;
-  setWalletCreated: (created: boolean) => void;
-  unlockWallet: () => void;
-  lockWallet: () => void;
-  clearWallets: () => void;
-
-
-
-  // ===== APP STATE ACTIONS =====
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
-  setLastUpdated: (date: Date) => void;
-  setOnline: (online: boolean) => void;
-  clearError: () => void;
-
-  // ===== TRANSACTION DATA ACTIONS =====
-  setBackendURL: (url: string) => void;
-  setTransactionData: (data: TransactionData) => void;
-  fetchTransactionData: () => Promise<void>;
-
-  // ===== DATA REFRESH ACTIONS =====
-  refreshWalletData: () => Promise<void>;
-  refreshGoldPrice: () => Promise<void>;
-  startBackgroundGoldPriceService: () => void;
-  setGoldPriceHistory: (history: Array<{ date: string; price: number }> | null) => void;
-  refreshPriceHistory: () => Promise<void>;
-
-  // ===== AUTHORIZATION ACTIONS =====
-  checkWalletAuthorization: () => Promise<void>;
-  authorizeWallet: () => Promise<boolean>;
-  setAuthorizationSnapshot: (status: AuthorizationStatus) => void;
-
-  // ===== ACTIVE TRANSACTION ACTIONS =====
-  setActiveTransaction: (tx: Partial<GlobalState['activeTransaction']>) => void;
-  updateActiveTransactionStatus: (status: GlobalState['activeTransaction']['status'], hash?: string | null) => void;
-  addActiveTransactionLog: (message: string, data?: any) => void;
-  setActiveTransactionStep: (step: string, progress?: number | null) => void;
-  setActiveTransactionContext: (ctx: Partial<GlobalState['activeTransaction']['context']>) => void;
-  clearActiveTransaction: () => void;
-
-  // ===== AUTHORIZATION TRANSACTION ACTIONS =====
-  setAuthorizationTransaction: (tx: Partial<GlobalState['authorizationTransaction']>) => void;
-  updateAuthorizationStatus: (status: GlobalState['authorizationTransaction']['status'], hash?: string | null) => void;
-  addAuthorizationLog: (message: string, data?: any) => void;
-  setAuthorizationStep: (step: string, progress?: number | null) => void;
-  setAuthorizationContext: (ctx: Partial<GlobalState['authorizationTransaction']['context']>) => void;
-  clearAuthorizationTransaction: () => void;
-  
-  // ===== UNOFFICIAL AUTHORIZATION ACTIONS =====
-  setUnofficialAuthorization: (status: boolean) => void;
-  clearUnofficialAuthorization: () => void;
-}
 
 
 // ===== GLOBAL STORE =====
@@ -235,7 +18,6 @@ export const useGlobalStore = create<GlobalState>()(
       currentWallet: null,
       isWalletCreated: false,
       isUnlocked: false,
-      _hasHydrated: false,
 
       // Authorization state
       authorizationStatus: null,
@@ -269,27 +51,13 @@ export const useGlobalStore = create<GlobalState>()(
         context: null,
       },
 
-      // App config (single token)
-      defaultChainIdNumeric: 137, // Default to Polygon mainnet
-      predefinedToken: {
-        address: '0x756715CF771C82aFB371B9C9f9Dd64E690766351',
-        symbol: 'Gold',
-        name: 'XRB Gold',
-        decimals: 18,
-        price: 121,
-        logo: 'xrbg',
-      },
+      // App config (single token) - using DEFAULT_APP_CONFIG
+      defaultChainIdNumeric: DEFAULT_APP_CONFIG.defaultChainIdNumeric,
+      predefinedToken: DEFAULT_APP_CONFIG.predefinedToken,
       backendURL: 'https://cpprhb1jz6.execute-api.us-east-1.amazonaws.com',
 
-      // Orchestrator config (single source of truth)
-      orchestratorConfig: {
-        delegationAddress: '0x9a686F5eaE58B62B435EAa034d48E57dc94BC36c',
-        providerUrl: 'https://polygon-rpc.com',
-        relayerEndpoint: 'https://cpprhb1jz6.execute-api.us-east-1.amazonaws.com/relay',
-        maxRetries: 30,
-        retryDelayMs: 2000,
-        supportedChains: [137],
-      },
+      // Orchestrator config (single source of truth) - using DEFAULT_APP_CONFIG
+      orchestratorConfig: DEFAULT_APP_CONFIG.orchestratorConfig,
 
       // Transaction data
       transactionData: null,
@@ -308,9 +76,9 @@ export const useGlobalStore = create<GlobalState>()(
         },
       },
 
-      // Active chains state
-      activeChains: [],
-      isActiveChainsLoaded: false,
+      // Configuration loading state
+      isConfigLoaded: false,
+      configLastFetched: null,
 
       // ===== WALLET ACTIONS =====
       addWallet: (wallet: Wallet) => {
@@ -861,33 +629,42 @@ export const useGlobalStore = create<GlobalState>()(
         set({ unofficialAuthorizationStatus: null, authorizationPending: false });
       },
 
+      // ===== CONFIGURATION ACTIONS =====
+      fetchAppConfig: async () => {
+        const state = get();
+        if (!state.backendURL) return;
+        
+        const { fetchConfigFromBackend } = await import('../services/app-config');
+        const config = await fetchConfigFromBackend(state.backendURL);
+        
+        set({
+          defaultChainIdNumeric: config.defaultChainIdNumeric,
+          predefinedToken: config.predefinedToken as PredefinedTokenConfig,
+          orchestratorConfig: config.orchestratorConfig,
+          isConfigLoaded: true,
+          configLastFetched: new Date(),
+        });
+      },
+
+      updateAppConfig: (config: any) => {
+        set({
+          defaultChainIdNumeric: config.defaultChainIdNumeric ?? get().defaultChainIdNumeric,
+          predefinedToken: config.predefinedToken ?? get().predefinedToken,
+          orchestratorConfig: config.orchestratorConfig ?? get().orchestratorConfig,
+          isConfigLoaded: true,
+          configLastFetched: new Date(),
+        });
+      },
+
     }),
     {
       name: 'global-store',
       storage: createJSONStorage(() => AsyncStorage),
       version: 1,
       migrate: (persisted: any, version: number) => {
-        // Ensure predefined token migrates to XRBG and includes logo
-        try {
-          const next = { ...(persisted || {}) };
-          const pt = next.predefinedToken || null;
-          const shouldMigrate = !pt || pt.symbol !== 'Gold' || pt.address !== '0x756715CF771C82aFB371B9C9f9Dd64E690766351';
-          if (shouldMigrate) {
-            next.predefinedToken = {
-              address: '0x756715CF771C82aFB371B9C9f9Dd64E690766351',
-              symbol: 'Gold',
-              name: 'XRB Gold',
-              decimals: 18,
-              price: (pt && typeof pt.price === 'number') ? pt.price : 121,
-              logo: 'xrbg',
-            };
-          } else if (!pt.logo) {
-            next.predefinedToken = { ...pt, logo: 'xrbg' };
-          }
-          return next;
-        } catch (_e) {
-          return persisted;
-        }
+        // Minimal migration for backward compatibility
+        // Only ensure data structure, not specific values
+        return persisted;
       },
       partialize: (state) => ({
         // Persist wallet data
@@ -898,6 +675,9 @@ export const useGlobalStore = create<GlobalState>()(
         defaultChainIdNumeric: state.defaultChainIdNumeric,
         predefinedToken: state.predefinedToken,
         backendURL: state.backendURL,
+        // Persist config loading state
+        isConfigLoaded: state.isConfigLoaded,
+        configLastFetched: state.configLastFetched,
         // Persist transaction data
         transactionData: state.transactionData,
         allTransfers: state.allTransfers,
@@ -915,63 +695,6 @@ export const useGlobalStore = create<GlobalState>()(
           goldPrice: state.appState.goldPrice,
         },
       }),
-      onRehydrateStorage: () => (state) => {
-        console.log('GlobalStore: Rehydration completed');
-        if (state) {
-          // Ensure predefined token is set if it's missing or missing price
-          if (!state.predefinedToken) {
-            console.log('GlobalStore: Setting predefined token after rehydration');
-            state.predefinedToken = {
-              address: '0x756715CF771C82aFB371B9C9f9Dd64E690766351',
-              symbol: 'Gold',
-              name: 'XRB Gold',
-              decimals: 18,
-              price: 121,
-              logo: 'xrbg',
-            };
-          } else if (typeof state.predefinedToken.price !== 'number') {
-            console.log('GlobalStore: Setting predefined token price after rehydration');
-            state.predefinedToken.price = 121;
-          }
-
-          // If store was previously USDC or missing logo, force Gold migration in-memory too
-          if (
-            state.predefinedToken.symbol !== 'Gold' ||
-            state.predefinedToken.address !== '0x756715CF771C82aFB371B9C9f9Dd64E690766351'
-          ) {
-            console.log('GlobalStore: Migrating predefined token to Gold on rehydration');
-            state.predefinedToken = {
-              address: '0x756715CF771C82aFB371B9C9f9Dd64E690766351',
-              symbol: 'Gold',
-              name: 'XRB Gold',
-              decimals: 18,
-              price: typeof state.predefinedToken.price === 'number' ? state.predefinedToken.price : 121,
-              logo: 'xrbg',
-            };
-          } else if (!state.predefinedToken.logo) {
-            state.predefinedToken.logo = 'xrbg';
-          }
-          
-          console.log('GlobalStore: Rehydrated state:', {
-            walletsCount: state.wallets.length,
-            currentWallet: state.currentWallet?.address,
-            isWalletCreated: state.isWalletCreated,
-            defaultChainIdNumeric: state.defaultChainIdNumeric,
-            hasPredefinedToken: !!state.predefinedToken,
-          });
-          // Mark as hydrated
-          state._hasHydrated = true;
-
-          // Initialize background gold price service after rehydration
-          if (state.backendURL) {
-            import('../services/background-gold-price').then(({ initializeBackgroundGoldPriceService }) => {
-              initializeBackgroundGoldPriceService();
-            }).catch((error) => {
-              console.error('Failed to initialize background gold price service:', error);
-            });
-          }
-        }
-      },
     }
   )
 );

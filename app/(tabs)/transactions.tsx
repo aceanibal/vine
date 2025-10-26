@@ -88,8 +88,10 @@ export default function TransactionsScreen() {
 
     return (
       <TouchableOpacity 
-        className="rounded-lg border border-blue-green p-4 gap-3"
-        onPress={() => {
+      className={`rounded-lg p-4 gap-3 ${
+        direction === 'receive' ? 'bg-cambridge-blue/5' : 'bg-lapis-lazuli/5'
+      }`}
+              onPress={() => {
           console.log('Transaction pressed:', transfer.hash);
           // TODO: Navigate to transaction details screen
         }}
@@ -97,13 +99,14 @@ export default function TransactionsScreen() {
         <View className="flex-row items-start justify-between">
           {/* Left side - transaction info */}
           <View className="flex-1 min-w-0 gap-1">
-            <Text className="text-base font-semibold text-lapis-lazuli">
-              {direction === 'receive' ? 'Received' : 'Sent'} {predefinedToken?.symbol || 'tokens'}
+            <Text 
+              className={'text-base font-semibold text-lapis-lazuli'}>
+              {direction === 'receive' ? 'Received' : 'Sent'}
             </Text>
             
             <View className="flex-row items-center gap-2">
               <Text className="text-sm text-blue-green">
-                POLYGON
+                {predefinedToken?.chainName}
               </Text>
               <Text className="text-sm text-blue-green">•</Text>
               <Text className="text-sm text-blue-green">
@@ -126,8 +129,8 @@ export default function TransactionsScreen() {
         
         {/* Transaction hash (truncated) */}
         <View className="pt-3 border-t border-blue-green/20">
-          <Text className="text-sm text-blue-green">
-            Hash: {transfer.hash.slice(0, 10)}...{transfer.hash.slice(-8)}
+          <Text className=" text-lapis-lazuli/80">
+            Hash: {transfer.hash}
           </Text>
         </View>
       </TouchableOpacity>
@@ -176,7 +179,7 @@ export default function TransactionsScreen() {
       {/* Transaction List */}
       <ScrollView className="flex-1 p-4">
         <View className="gap-3">
-          <Text className="text-base text-blue-green">
+          <Text className="text-base text-lapis-lazuli/80">
             {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''} found
           </Text>
 
@@ -187,7 +190,7 @@ export default function TransactionsScreen() {
           ) : (
             <View className="items-center justify-center py-12 gap-2">
               <MaterialIcons name="history" size={48} color="#7FAFA1" />
-              <Text className="text-lg font-semibold text-blue-green">
+              <Text className="text-lg font-semibold text-lapis-lazuli/80">
                 No transactions found
               </Text>
               <Text className="text-base text-blue-green text-center">

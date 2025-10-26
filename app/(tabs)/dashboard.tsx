@@ -95,7 +95,7 @@ export default function DashboardScreen() {
   const lastUpdated = useGlobalStore((state) => state.appState.lastUpdated);
   const allTransfers = useGlobalStore((state) => state.allTransfers);
   const priceHistory = usePriceHistory();
-  
+  const imageUrl = predefinedToken?.logo;
   // Get recent transactions
   const recentTransactions = useMemo(() => {
     return allTransfers
@@ -277,21 +277,24 @@ export default function DashboardScreen() {
             <View className="gap-1 rounded-xl bg-lapis-lazuli/5 p-2 mx-5 mb-3">
               <View className="flex-row items-center justify-between">
                 <View className="flex-1">
-                  <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 20, minHeight: 26 }}>Gold Balance</Text>
+                  <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 20, minHeight: 26 }}>{predefinedToken?.name} Balance</Text>
                   <Text className="font-semibold mt-1 text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15 }}>
                     {tokenData.balance} grams
                   </Text>
                 </View>
                 <Image 
-                  source={require('~/assets/xrb-gold-logo-icon.png')} 
+                  source={{uri: imageUrl}} 
                   style={{ width: 40, height: 40, opacity: 0.6 }} 
                   resizeMode="contain"
+                  onError={() => {
+                    console.warn('Failed to load token logo:', imageUrl);
+                  }}
                 />
               </View>
               
               <View className="flex-row items-center justify-between">
                 <View className="flex-1">
-                  <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 20, minHeight: 26 }}>Gold Price</Text>
+                  <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 20, minHeight: 26 }}>{predefinedToken?.symbol} Price</Text>
                   <Text className="font-semibold mt-1 text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15 }}>
                     {formatCurrency(tokenData.price)} per gram
                   </Text>
@@ -355,7 +358,7 @@ export default function DashboardScreen() {
                     >
                       <View className="flex-1 mr-2">
                         <Text className="font-medium text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15 }}>
-                          {isReceive ? 'Received' : 'Sent'} Gold
+                          {isReceive ? 'Received' : 'Sent'} {predefinedToken?.symbol}
                         </Text>
                         <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 12 }}>
                           {formatTransactionDate(transfer.timestamp, transfer.blockNumber)}
