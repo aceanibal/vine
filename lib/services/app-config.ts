@@ -5,7 +5,7 @@ export interface AppConfig {
     symbol: string;
     name: string;
     decimals: number;
-    price: number;
+    price: number | null;
     logo?: string;
     chainName: string;
   };
@@ -27,7 +27,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     symbol: 'PAXG',
     name: 'PAXG',
     decimals: 18,
-    price: 121,
+    price: null,
     logo: 'https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png',
     chainName: 'Polygon',
   },

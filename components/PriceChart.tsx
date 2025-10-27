@@ -12,7 +12,7 @@ interface PriceDataPoint {
 
 interface PriceChartProps {
   data: PriceDataPoint[] | null;
-  currentPrice?: number;
+  currentPrice?: number | null;
   height?: number;
 }
 
@@ -59,13 +59,20 @@ export function PriceChart({ data, currentPrice, height = 100 }: PriceChartProps
         overflow: 'hidden'
       }} 
       className="rounded-xl bg-blue-green/2 items-center justify-center">
+        <RNText style={{
+          color: '#225D7C',
+          fontSize: 14,
+          fontWeight: '500',
+        }}>
+          No price data available
+        </RNText>
       </View>
     );
   }
 
   // Combine historical data with current price (both already in USD per gram)
   let chartDataPoints = data;
-  if (currentPrice !== undefined) {
+  if (currentPrice !== undefined && currentPrice !== null) {
     const today = new Date().toISOString().split('T')[0];
     const hasToday = data.some(point => point.date?.startsWith(today));
     

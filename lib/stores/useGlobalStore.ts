@@ -636,7 +636,8 @@ export const useGlobalStore = create<GlobalState>()(
         
         const { fetchConfigFromBackend } = await import('../services/app-config');
         const config = await fetchConfigFromBackend(state.backendURL);
-        
+        console.log('GlobalStore: fetchAppConfig: config', config);
+
         set({
           defaultChainIdNumeric: config.defaultChainIdNumeric,
           predefinedToken: config.predefinedToken as PredefinedTokenConfig,

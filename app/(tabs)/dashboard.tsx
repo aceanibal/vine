@@ -4,7 +4,6 @@ import { View, ScrollView, TouchableOpacity, RefreshControl, Modal, Image } from
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
-import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
 
 import { Button } from 'react-native-paper';
@@ -106,11 +105,11 @@ export default function DashboardScreen() {
   // Calculate token data
   const tokenData = useMemo(() => {
     if (!predefinedToken) {
-      return { balance: '0', price: 0, totalValue: 0 };
+      return { balance: '0', price: null, totalValue: 0 };
     }
     
     const rawBalance = tokenBalance?.balance?.tokenBalanceDecimal || tokenBalance?.balance?.tokenBalance || '0';
-    const price = typeof (predefinedToken as any).price === 'number' ? (predefinedToken as any).price : 121;
+    const price = predefinedToken.price; // This will be null if not updated from API
     
     let numericBalance = 0;
     try {
@@ -121,7 +120,7 @@ export default function DashboardScreen() {
     }
     
     const balance = formatTokenBalance(rawBalance, predefinedToken.decimals);
-    const totalValue = numericBalance * price;
+    const totalValue = price ? numericBalance * price : 0;
     
     return {
       balance,
@@ -188,16 +187,6 @@ export default function DashboardScreen() {
     router.push('/(auth)/create-wallet' as any);
   };
 
-  const copyToClipboard = async () => {
-    if (currentWallet?.address) {
-      try {
-        await Clipboard.setStringAsync(currentWallet.address);
-        await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      } catch (error) {
-        console.error('Failed to copy to clipboard:', error);
-      }
-    }
-  };
 
 
   if (isPageLoading) {
@@ -258,7 +247,7 @@ export default function DashboardScreen() {
                   Total Balance
                 </Text>
                 <Text className="text-lapis-lazuli font-bold" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 48, minHeight: 56 }}>
-                  {formatCurrency(tokenData.totalValue)}
+                  {tokenData.price ? formatCurrency(tokenData.totalValue) : '---'}
                 </Text>
               </View>
               <TouchableOpacity 
@@ -296,7 +285,7 @@ export default function DashboardScreen() {
                 <View className="flex-1">
                   <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 20, minHeight: 26 }}>{predefinedToken?.symbol} Price</Text>
                   <Text className="font-semibold mt-1 text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15 }}>
-                    {formatCurrency(tokenData.price)} per gram
+                    {tokenData.price ? formatCurrency(tokenData.price) : '---'} per gram
                   </Text>
                 </View>
               </View>

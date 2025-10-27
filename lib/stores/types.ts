@@ -12,7 +12,7 @@ export interface PredefinedTokenConfig {
   symbol: string;
   name: string;
   decimals: number;
-  price: number; // Token price in USD
+  price: number | null; // Token price in USD
   // Optional local logo identifier for rendering bundled assets
   logo?: string;
 }
