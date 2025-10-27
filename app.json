@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "my-expo-app",
-    "slug": "my-expo-app",
+    "name": "Metals",
+    "slug": "metals-wallet",
     "version": "1.0.0",
-    "scheme": "my-expo-app",
+    "scheme": "metals-wallet",
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -23,23 +23,30 @@
     "splash": {
       "image": "./assets/splash.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#225D7C"
     },
     "assetBundlePatterns": [
       "**/*"
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.myexpoapp",
+      "bundleIdentifier": "com.metals.wallet",
       "infoPlist": {
-        "ITSAppUsesNonExemptEncryption": false
+        "ITSAppUsesNonExemptEncryption": false,
+        "CFBundleDisplayName": "Metals"
       }
     },
     "android": {
+      "package": "com.metals.wallet",
+      "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
-      }
+        "backgroundColor": "#1a4a5c"
+      },
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.ACCESS_NETWORK_STATE"
+      ]
     },
     "extra": {
       "router": {},
@@ -47,6 +54,6 @@
         "projectId": "b2efca17-4900-41e3-b07d-fd910e444552"
       }
     },
-    "owner": "aceanibal"
+    "owner": "metals-team"
   }
 }
