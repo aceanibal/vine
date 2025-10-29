@@ -26,17 +26,21 @@ const getSecrets = async () => (await import('./wallet-secure-store'));
 // Revocation: Uses transaction mining status (no delegation checking needed)
 
 function resolveConfigFromStore(): OrchestratorConfig {
-  const { orchestratorConfig, defaultChainIdNumeric } = (require('../stores/useGlobalStore') as any).useGlobalStore.getState();
+  const { orchestratorConfig, defaultChainIdNumeric, backendURL } = (require('../stores/useGlobalStore') as any).useGlobalStore.getState();
   
   if (!orchestratorConfig.treasury) {
     throw new Error('Treasury address not found in orchestrator config. Please ensure the app config is loaded.');
   }
   
+  // Derive relayer endpoint from backend base URL when available
+  const base = typeof backendURL === 'string' ? backendURL.replace(/\/+$/, '') : orchestratorConfig.relayerEndpoint;
+  const relayerEndpoint = backendURL ? `${base}/relay` : orchestratorConfig.relayerEndpoint;
+  
   return {
     chainId: defaultChainIdNumeric,
     delegationAddress: orchestratorConfig.delegationAddress,
     providerUrl: orchestratorConfig.providerUrl,
-    relayerEndpoint: orchestratorConfig.relayerEndpoint,
+    relayerEndpoint,
     maxRetries: orchestratorConfig.maxRetries,
     retryDelayMs: orchestratorConfig.retryDelayMs,
     treasury: orchestratorConfig.treasury,

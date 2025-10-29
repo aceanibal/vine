@@ -24,18 +24,18 @@ export interface AppConfig {
 export const DEFAULT_APP_CONFIG: AppConfig = {
   defaultChainIdNumeric: 137, // Polygon mainnet
   predefinedToken: {
-    address: '0x756715CF771C82aFB371B9C9f9Dd64E690766351',
-    symbol: 'PAXG',
-    name: 'PAXG',
+    address: '0xf1d0312Bbb4073421e65984f20C79F9b6b0d0f44',
+    symbol: 'SGLD',
+    name: 'SGLD',
     decimals: 18,
     price: null,
-    logo: 'https://assets.coingecko.com/coins/images/6319/thumb/USD_Coin_icon.png',
+    logo: 'https://raw.githubusercontent.com/aceanibal/assets/main/icon.png',
     chainName: 'Polygon',
   },
   orchestratorConfig: {
     delegationAddress: '0x9a686F5eaE58B62B435EAa034d48E57dc94BC36c',
     providerUrl: 'https://polygon-rpc.com',
-    relayerEndpoint: 'https://cpprhb1jz6.execute-api.us-east-1.amazonaws.com/relay',
+    relayerEndpoint: 'https://metalsbackend.lbf.solutions/relay',
     maxRetries: 30,
     retryDelayMs: 2000,
     supportedChains: [137],
@@ -46,7 +46,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
 export async function fetchConfigFromBackend(backendURL: string): Promise<AppConfig> {
   try {
     const response = await fetch(`${backendURL}/info`);
-    if (!response.ok) {
+    if (true) {
       console.warn('Failed to fetch app config from API, using default config');
       return DEFAULT_APP_CONFIG;
     }
