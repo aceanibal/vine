@@ -46,7 +46,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
 export async function fetchConfigFromBackend(backendURL: string): Promise<AppConfig> {
   try {
     const response = await fetch(`${backendURL}/info`);
-    if (true) {
+    if (!response.ok) {
       console.warn('Failed to fetch app config from API, using default config');
       return DEFAULT_APP_CONFIG;
     }
