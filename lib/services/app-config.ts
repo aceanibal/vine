@@ -16,6 +16,7 @@ export interface AppConfig {
     maxRetries: number;
     retryDelayMs: number;
     supportedChains: number[];
+    treasury: string;
   };
 }
 
@@ -38,6 +39,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
     maxRetries: 30,
     retryDelayMs: 2000,
     supportedChains: [137],
+    treasury: '0x529aB80a88A95e495E7772a6cc5c3bAFd009D6b6',
   },
 };
 
@@ -49,7 +51,35 @@ export async function fetchConfigFromBackend(backendURL: string): Promise<AppCon
       return DEFAULT_APP_CONFIG;
     }
     const config = await response.json();
-    return config || DEFAULT_APP_CONFIG;
+    if (!config) {
+      return DEFAULT_APP_CONFIG;
+    }
+    
+    // Deep merge with defaults to ensure all fields are present
+    const mergedConfig: AppConfig = {
+      defaultChainIdNumeric: config.defaultChainIdNumeric ?? DEFAULT_APP_CONFIG.defaultChainIdNumeric,
+      predefinedToken: {
+        address: config.predefinedToken?.address ?? DEFAULT_APP_CONFIG.predefinedToken.address,
+        symbol: config.predefinedToken?.symbol ?? DEFAULT_APP_CONFIG.predefinedToken.symbol,
+        name: config.predefinedToken?.name ?? DEFAULT_APP_CONFIG.predefinedToken.name,
+        decimals: config.predefinedToken?.decimals ?? DEFAULT_APP_CONFIG.predefinedToken.decimals,
+        // Do not accept price from backend; keep default (null)
+        price: DEFAULT_APP_CONFIG.predefinedToken.price,
+        logo: config.predefinedToken?.logo ?? DEFAULT_APP_CONFIG.predefinedToken.logo,
+        chainName: config.predefinedToken?.chainName ?? DEFAULT_APP_CONFIG.predefinedToken.chainName,
+      },
+      orchestratorConfig: {
+        delegationAddress: config.orchestratorConfig?.delegationAddress ?? DEFAULT_APP_CONFIG.orchestratorConfig.delegationAddress,
+        providerUrl: config.orchestratorConfig?.providerUrl ?? DEFAULT_APP_CONFIG.orchestratorConfig.providerUrl,
+        relayerEndpoint: config.orchestratorConfig?.relayerEndpoint ?? DEFAULT_APP_CONFIG.orchestratorConfig.relayerEndpoint,
+        maxRetries: config.orchestratorConfig?.maxRetries ?? DEFAULT_APP_CONFIG.orchestratorConfig.maxRetries,
+        retryDelayMs: config.orchestratorConfig?.retryDelayMs ?? DEFAULT_APP_CONFIG.orchestratorConfig.retryDelayMs,
+        supportedChains: config.orchestratorConfig?.supportedChains ?? DEFAULT_APP_CONFIG.orchestratorConfig.supportedChains,
+        treasury: config.orchestratorConfig?.treasury ?? DEFAULT_APP_CONFIG.orchestratorConfig.treasury,
+      },
+    };
+    
+    return mergedConfig;
   } catch (error) {
     console.error('Failed to fetch app config:', error);
     return DEFAULT_APP_CONFIG;

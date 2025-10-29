@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Metals",
-    "slug": "metals-wallet",
+    "slug": "my-expo-app",
     "version": "1.0.0",
     "scheme": "metals-wallet",
     "web": {
@@ -54,6 +54,6 @@
         "projectId": "b2efca17-4900-41e3-b07d-fd910e444552"
       }
     },
-    "owner": "metals-team"
+    "owner": "aceanibal"
   }
 }

@@ -146,6 +146,7 @@ export interface GlobalState {
     maxRetries: number;
     retryDelayMs: number;
     supportedChains: number[];
+    treasury: string;
   };
 
   // ===== CONFIGURATION LOADING STATE =====

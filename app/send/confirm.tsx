@@ -27,6 +27,15 @@ export default function ConfirmScreen() {
   
   const [isLoading, setIsLoading] = useState(false);
 
+  // Normalize a numeric amount to a decimal string with at most `decimals` fractional digits.
+  // Ensures no scientific notation and trims trailing zeros.
+  const normalizeAmount = (value: number | string, decimals: number): string => {
+    const num = typeof value === 'number' ? value : parseFloat(String(value));
+    if (!isFinite(num) || num < 0) return '0';
+    const fixed = num.toFixed(decimals);
+    return fixed.replace(/\.0+$/, '').replace(/(\.\d*?)0+$/, '$1');
+  };
+
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat('en-US', {
       style: 'currency',
@@ -199,12 +208,15 @@ export default function ConfirmScreen() {
     
     try {
       router.replace('/send/active-transaction');
-      // TODO: Implement paid transfer with fee
+      const decimals = predefinedToken.decimals;
+      const amountStr = normalizeAmount(amountNumber, decimals);
+      const feeStr = normalizeAmount(calculateNetworkFee(amountNumber), decimals);
       await executeSponsoredTransfer({
         fromAddress: currentWallet.address,
         tokenAddress: predefinedToken.address,
         toAddress: recipientAddress,
-        amount: amount,
+        amount: amountStr,
+        feeAmount: feeStr,
       });
 
       setIsLoading(false);
@@ -249,12 +261,15 @@ export default function ConfirmScreen() {
     
     try {
       router.replace('/send/active-transaction');
-      // TODO: Implement paid transfer with fee deducted from amount
+      const decimals = predefinedToken.decimals;
+      const amountAfterFeeStr = normalizeAmount(amountAfterFee, decimals);
+      const feeStr = normalizeAmount(feeInTokens, decimals);
       await executeSponsoredTransfer({
         fromAddress: currentWallet.address,
         tokenAddress: predefinedToken.address,
         toAddress: recipientAddress,
-        amount: amountAfterFee.toString(),
+        amount: amountAfterFeeStr,
+        feeAmount: feeStr,
       });
 
       setIsLoading(false);
@@ -290,11 +305,13 @@ export default function ConfirmScreen() {
     
     try {
       router.replace('/send/active-transaction');
+      const decimals = predefinedToken.decimals;
+      const amountStr = normalizeAmount(amountNumber, decimals);
       await executeSponsoredTransfer({
         fromAddress: currentWallet.address,
         tokenAddress: predefinedToken.address,
         toAddress: recipientAddress,
-        amount: amount,
+        amount: amountStr,
       });
 
       setIsLoading(false);

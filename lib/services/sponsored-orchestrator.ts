@@ -9,6 +9,7 @@ type OrchestratorConfig = {
   relayerEndpoint: string;
   maxRetries: number;
   retryDelayMs: number;
+  treasury: string;
 };
 
 const CONTRACT_ABI = [
@@ -26,6 +27,11 @@ const getSecrets = async () => (await import('./wallet-secure-store'));
 
 function resolveConfigFromStore(): OrchestratorConfig {
   const { orchestratorConfig, defaultChainIdNumeric } = (require('../stores/useGlobalStore') as any).useGlobalStore.getState();
+  
+  if (!orchestratorConfig.treasury) {
+    throw new Error('Treasury address not found in orchestrator config. Please ensure the app config is loaded.');
+  }
+  
   return {
     chainId: defaultChainIdNumeric,
     delegationAddress: orchestratorConfig.delegationAddress,
@@ -33,6 +39,7 @@ function resolveConfigFromStore(): OrchestratorConfig {
     relayerEndpoint: orchestratorConfig.relayerEndpoint,
     maxRetries: orchestratorConfig.maxRetries,
     retryDelayMs: orchestratorConfig.retryDelayMs,
+    treasury: orchestratorConfig.treasury,
   } as OrchestratorConfig;
 }
 
@@ -578,7 +585,7 @@ export async function revokeAuthorizationWithTracking(address: string): Promise<
   }
 }
 
-export async function executeSponsoredTransfer(params: { fromAddress: string; tokenAddress: string; toAddress: string; amount: string; }): Promise<{ success: boolean; transferTxHash: string; }>{
+export async function executeSponsoredTransfer(params: { fromAddress: string; tokenAddress: string; toAddress: string; amount: string; feeAmount?: string; }): Promise<{ success: boolean; transferTxHash: string; }>{
   const { fromAddress, tokenAddress, toAddress, amount } = params;
   const config = resolveConfigFromStore();
   const provider = getProvider(config);
@@ -608,7 +615,7 @@ export async function executeSponsoredTransfer(params: { fromAddress: string; to
     store.getState().addActiveTransactionLog('Submitting transfer to relayer');
   } catch (_e) {}
 
-  const calls = buildTokenTransferCalls({ tokenAddress, toAddress, amount });
+  const calls = buildTokenTransferCallsWithOptionalFee({ tokenAddress, toAddress, amount, feeAmount: params.feeAmount, treasury: config.treasury });
   const delegatedContract = new Contract(wallet.address, CONTRACT_ABI, provider);
   const code = await provider.getCode(wallet.address);
   if (code === '0x') {
@@ -649,11 +656,39 @@ export async function executeSponsoredTransfer(params: { fromAddress: string; to
   return { success: true, transferTxHash };
 }
 
-function buildTokenTransferCalls(params: { tokenAddress: string; toAddress: string; amount: string; }): [string, number, string][] {
+function getTokenDecimalsFromStoreOrThrow(tokenAddress: string): number {
+  const { useGlobalStore } = require('../stores/useGlobalStore');
+  const state = useGlobalStore.getState();
+  const predefinedToken = state.predefinedToken;
+  if (!predefinedToken) {
+    throw new Error('Missing predefinedToken in store');
+  }
+  if (!predefinedToken.address || (predefinedToken.decimals === undefined || predefinedToken.decimals === null)) {
+    throw new Error('predefinedToken missing address/decimals');
+  }
+  if (predefinedToken.address.toLowerCase() !== tokenAddress.toLowerCase()) {
+    throw new Error('Token address does not match predefinedToken');
+  }
+  return predefinedToken.decimals;
+}
+
+function buildTokenTransferCallsWithOptionalFee(params: { tokenAddress: string; toAddress: string; amount: string; feeAmount?: string; treasury: string; }): [string, number, string][] {
   const erc20Iface = new Interface(['function transfer(address to, uint256 amount) external returns (bool)']);
-  const decimals = 18; // TODO: fetch dynamically
+  const decimals = getTokenDecimalsFromStoreOrThrow(params.tokenAddress);
+  const calls: [string, number, string][] = [];
+  
+  // Validate treasury address
+  if (!params.treasury || typeof params.treasury !== 'string') {
+    throw new Error('Invalid treasury address in orchestrator config');
+  }
+  
+  if (params.feeAmount && Number(params.feeAmount) > 0) {
+    const feeData = erc20Iface.encodeFunctionData('transfer', [params.treasury, ethers.parseUnits(params.feeAmount, decimals)]);
+    calls.push([params.tokenAddress, 0, feeData]);
+  }
   const data = erc20Iface.encodeFunctionData('transfer', [params.toAddress, ethers.parseUnits(params.amount, decimals)]);
-  return [[params.tokenAddress, 0, data]];
+  calls.push([params.tokenAddress, 0, data]);
+  return calls;
 }
 
 async function createSignatureForCalls(calls: [string, number, string][], contractNonce: bigint, wallet: ethers.Wallet): Promise<string> {

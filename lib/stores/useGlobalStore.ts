@@ -638,23 +638,33 @@ export const useGlobalStore = create<GlobalState>()(
         const config = await fetchConfigFromBackend(state.backendURL);
         console.log('GlobalStore: fetchAppConfig: config', config);
 
-        set({
+        set((s) => ({
           defaultChainIdNumeric: config.defaultChainIdNumeric,
-          predefinedToken: config.predefinedToken as PredefinedTokenConfig,
+          // Preserve existing price; never take price from app-config
+          predefinedToken: s.predefinedToken ? ({
+            ...s.predefinedToken,
+            ...config.predefinedToken,
+            price: s.predefinedToken.price ?? null,
+          } as PredefinedTokenConfig) : (config.predefinedToken as PredefinedTokenConfig),
           orchestratorConfig: config.orchestratorConfig,
           isConfigLoaded: true,
           configLastFetched: new Date(),
-        });
+        }));
       },
 
       updateAppConfig: (config: any) => {
-        set({
-          defaultChainIdNumeric: config.defaultChainIdNumeric ?? get().defaultChainIdNumeric,
-          predefinedToken: config.predefinedToken ?? get().predefinedToken,
-          orchestratorConfig: config.orchestratorConfig ?? get().orchestratorConfig,
+        set((s) => ({
+          defaultChainIdNumeric: config.defaultChainIdNumeric ?? s.defaultChainIdNumeric,
+          // Merge predefined token but always preserve current price
+          predefinedToken: config.predefinedToken ? ({
+            ...(s.predefinedToken || {}),
+            ...config.predefinedToken,
+            price: s.predefinedToken?.price ?? null,
+          } as PredefinedTokenConfig) : s.predefinedToken,
+          orchestratorConfig: config.orchestratorConfig ?? s.orchestratorConfig,
           isConfigLoaded: true,
           configLastFetched: new Date(),
-        });
+        }));
       },
 
     }),
