@@ -200,9 +200,18 @@ export const useGlobalStore = create<GlobalState>()(
           ...data.transfers.fromAddress.transfers,
         ].sort((a, b) => b.blockNumber - a.blockNumber); // Sort by block number descending
 
+        // Filter out treasury address from transfers
+        const treasuryAddress = get().orchestratorConfig?.treasury;
+        const filteredTransfers = treasuryAddress 
+          ? allTransfers.filter(transfer => 
+              transfer.to.toLowerCase() !== treasuryAddress.toLowerCase() &&
+              transfer.from.toLowerCase() !== treasuryAddress.toLowerCase()
+            )
+          : allTransfers;
+
         set({
           transactionData: data,
-          allTransfers,
+          allTransfers: filteredTransfers,
           tokenBalance: data.tokenBalances,
         });
       },
