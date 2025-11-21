@@ -1,7 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { View, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, TouchableOpacity } from 'react-native';
 import { useState, useEffect } from 'react';
 
 import { Button } from 'react-native-paper';
@@ -14,6 +13,7 @@ import { removeWalletSecrets, loadWalletSecrets } from '~/lib/services/wallet-se
 import { CustomModal } from '~/components/CustomModal';
 import { Toast } from '~/components/Toast';
 import { RecoveryPhraseModal } from '~/components/RecoveryPhraseModal';
+import { ScreenWithImageBackground } from '~/components/ScreenWithImageBackground';
  
 
 export default function SettingsScreen() {
@@ -202,9 +202,8 @@ export default function SettingsScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
-      <ScrollView className="flex-1 mt-6" contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="flex-1 rounded-t-3xl bg-white p-6">
+    <ScreenWithImageBackground>
+      <View className="flex-1 rounded-t-3xl bg-white p-6">
           <View className="gap-8">
 
           {/* Wallet Section */}
@@ -506,7 +505,6 @@ export default function SettingsScreen() {
         
         </View>
         </View>
-      </ScrollView>
 
       {/* Custom Modal */}
       <CustomModal
@@ -533,6 +531,6 @@ export default function SettingsScreen() {
         type={toastConfig.type}
         onHide={() => setShowToast(false)}
       />
-    </SafeAreaView>
+    </ScreenWithImageBackground>
   );
 } 

@@ -1,7 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { View, ScrollView, TouchableOpacity, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 import { Button } from 'react-native-paper';
 
@@ -9,6 +8,7 @@ import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useCurrentWallet, usePredefinedToken, useTokenBalance } from '~/lib/stores/useGlobalStore';
 import { executeSponsoredTransfer } from '~/lib/services/sponsored-orchestrator';
+import { ScreenWithImageBackground } from '~/components/ScreenWithImageBackground';
 
 export default function ConfirmScreen() {
   const { colors } = useColorScheme();
@@ -332,8 +332,8 @@ export default function ConfirmScreen() {
   const balanceCheck = checkAvailableBalance();
 
   return (
-    <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
-      <View className="flex-1 rounded-t-3xl bg-white mt-6">
+    <ScreenWithImageBackground showScrollView={false}>
+      <View className="flex-1 rounded-t-3xl bg-white mt-3">
         {/* Header with back/home buttons */}
         <View className="flex-row items-center justify-between p-4">
           <TouchableOpacity onPress={handleBackNavigation}>
@@ -520,7 +520,7 @@ export default function ConfirmScreen() {
           )}
         </View>
       </View>
-    </SafeAreaView>
+    </ScreenWithImageBackground>
   );
 }
 

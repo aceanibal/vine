@@ -1,13 +1,13 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { View, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, TouchableOpacity } from 'react-native';
 import { useEffect, useRef, useState } from 'react';
 import { Button } from 'react-native-paper';
 
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore } from '~/lib/stores/useGlobalStore';
+import { ScreenWithImageBackground } from '~/components/ScreenWithImageBackground';
 
 export default function ActiveTransactionScreen() {
   const { colors } = useColorScheme();
@@ -50,10 +50,10 @@ export default function ActiveTransactionScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
-      <View className="flex-1 rounded-t-3xl bg-white mt-6">
+    <ScreenWithImageBackground showScrollView={false}>
+      <View className="flex-1 rounded-t-3xl bg-white mt-3">
         
-        <ScrollView className="flex-1 px-6 mt-6">
+        <View className="flex-1 px-6 mt-3">
           <View className="gap-4">
             {/* Status Section - at top */}
             <View className="gap-2">
@@ -142,7 +142,7 @@ export default function ActiveTransactionScreen() {
 
             
           </View>
-        </ScrollView>
+        </View>
 
         {/* Return Button - Fixed at bottom */}
         <View className="px-4 pb-4 bg-white">
@@ -178,7 +178,7 @@ export default function ActiveTransactionScreen() {
           </Button>
         </View>
       </View>
-    </SafeAreaView>
+    </ScreenWithImageBackground>
   );
 }
 

@@ -1,7 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { View, TouchableOpacity, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useCallback } from 'react';
 import { useFocusEffect } from '@react-navigation/native';
 import { Button } from 'react-native-paper';
@@ -10,6 +9,7 @@ import { Text } from '~/components/nativewindui/Text';
 import { NumberPad } from '~/components/NumberPad';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore, useCurrentWallet, usePredefinedToken, useTokenBalance } from '~/lib/stores/useGlobalStore';
+import { ScreenWithImageBackground } from '~/components/ScreenWithImageBackground';
 
 export default function AmountScreen() {
   const { colors } = useColorScheme();
@@ -223,8 +223,8 @@ export default function AmountScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
-      <View className="flex-1 rounded-t-3xl bg-white mt-6">
+    <ScreenWithImageBackground showScrollView={false}>
+      <View className="flex-1 rounded-t-3xl bg-white mt-3">
         {/* Main Content - Fixed Layout */}
         <View className="flex-1 p-4 gap-4">
         {/* Title */}
@@ -340,7 +340,7 @@ export default function AmountScreen() {
         </View>
         </View>
       </View>
-    </SafeAreaView>
+    </ScreenWithImageBackground>
   );
 }
 

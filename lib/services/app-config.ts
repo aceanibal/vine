@@ -24,12 +24,12 @@ export interface AppConfig {
 export const DEFAULT_APP_CONFIG: AppConfig = {
   defaultChainIdNumeric: 137, // Polygon mainnet
   predefinedToken: {
-    address: '0xf1d0312Bbb4073421e65984f20C79F9b6b0d0f44',
-    symbol: 'SGLD',
-    name: 'SGLD',
+    address: '0x756715CF771C82aFB371B9C9f9Dd64E690766351',
+    symbol: 'PAX Gold',
+    name: 'PAX Gold',
     decimals: 18,
     price: null,
-    logo: 'https://raw.githubusercontent.com/aceanibal/assets/main/icon.png',
+    logo: 'https://cryptologos.cc/logos/pax-gold-paxg-logo.png',
     chainName: 'Polygon',
   },
   orchestratorConfig: {
@@ -46,7 +46,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
 export async function fetchConfigFromBackend(backendURL: string): Promise<AppConfig> {
   try {
     const response = await fetch(`${backendURL}/info`);
-    if (!response.ok) {
+    if (true ||!response.ok) {
       console.warn('Failed to fetch app config from API, using default config');
       return DEFAULT_APP_CONFIG;
     }

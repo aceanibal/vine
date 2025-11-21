@@ -38,8 +38,8 @@ export function NumberPad({ onKeyPress }: NumberPadProps) {
                     shadowOpacity: 0.25,
                     shadowRadius: 3.84,
                     elevation: 5,
-                    backgroundColor: pressed ? '#225D7C' : 'rgba(52, 153, 188, 0.05)',
-                    borderColor: pressed ? '#225D7C' : 'rgba(52, 153, 188, 0.05)',
+                    backgroundColor: pressed ? '#D9A848' : 'rgba(52, 153, 188, 0.05)',
+                    borderColor: pressed ? '#D9A848' : 'rgba(52, 153, 188, 0.05)',
                   }}
                 >
                   {key === 'backspace' ? (

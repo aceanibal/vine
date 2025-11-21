@@ -322,25 +322,17 @@ export const useGlobalStore = create<GlobalState>()(
       },
 
       refreshGoldPrice: async () => {
-        const state = get();
-        const backendURL = state.backendURL;
-        
-        if (!backendURL) {
-          console.log('GlobalStore: No backend URL configured for gold price refresh');
-          return;
-        }
-        
         try {
-          console.log('GlobalStore: Starting gold price refresh...');
+          console.log('GlobalStore: Starting CoinGecko gold price refresh...');
           
-          // Import and use the gold price service
-          const { fetchAndUpdateGoldPrice } = await import('../services/gold-price');
-          await fetchAndUpdateGoldPrice(backendURL);
+          // Import and use the CoinGecko gold price service
+          const { fetchAndUpdateCoinGeckoGoldPrice } = await import('../services/coingecko-gold-price');
+          await fetchAndUpdateCoinGeckoGoldPrice();
           
-          console.log('GlobalStore: Gold price refresh completed successfully');
+          console.log('GlobalStore: CoinGecko gold price refresh completed successfully');
           
         } catch (error) {
-          console.error('GlobalStore: Failed to refresh gold price:', error);
+          console.error('GlobalStore: Failed to refresh CoinGecko gold price:', error);
           
           // Update app state with error
           set((state) => ({
@@ -374,54 +366,23 @@ export const useGlobalStore = create<GlobalState>()(
       },
 
       refreshPriceHistory: async () => {
-        const state = get();
-        const backendURL = state.backendURL;
-
-        if (!backendURL) {
-          console.log('GlobalStore: No backend URL configured for price history refresh');
-          return;
-        }
-
         try {
-          console.log('GlobalStore: Starting gold price history refresh...');
+          console.log('GlobalStore: Starting CoinGecko price history refresh...');
 
-          // Import and use the gold price history service
-          // For manual refresh, we call fetchGoldPriceHistory directly (not checkAndRefreshGoldPriceHistory)
-          // The time check is only for background automatic updates
-          const { fetchGoldPriceHistory } = await import('../services/gold-price');
-          const priceHistory = await fetchGoldPriceHistory(backendURL);
+          // Import and use the CoinGecko price history service
+          const { fetchAndUpdatePaxGoldPriceHistory } = await import('../services/gold-history-price');
+          await fetchAndUpdatePaxGoldPriceHistory(30); // Fetch 30 days of history
 
-          console.log('GlobalStore: fetchGoldPriceHistory returned:', {
-            pointsCount: priceHistory?.length,
-          });
-
-          if (priceHistory && priceHistory.length > 0) {
-            set((state) => ({
-              appState: {
-                ...state.appState,
-                goldPrice: {
-                  history: priceHistory,
-                  lastHistoryFetch: new Date(),
-                },
-              },
-            }));
-            console.log('GlobalStore: Gold price history refresh completed successfully', {
-              pointsCount: priceHistory.length,
-              firstPoint: priceHistory[0],
-              lastPoint: priceHistory[priceHistory.length - 1],
-            });
-          } else {
-            console.log('GlobalStore: Gold price history returned empty data');
-          }
+          console.log('GlobalStore: CoinGecko price history refresh completed successfully');
 
         } catch (error) {
-          console.error('GlobalStore: Failed to refresh gold price history:', error);
+          console.error('GlobalStore: Failed to refresh CoinGecko price history:', error);
 
           // Update app state with error
           set((state) => ({
             appState: {
               ...state.appState,
-              error: error instanceof Error ? error.message : 'Failed to refresh gold price history',
+              error: error instanceof Error ? error.message : 'Failed to refresh price history',
             }
           }));
         }

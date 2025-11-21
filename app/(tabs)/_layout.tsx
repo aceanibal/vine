@@ -1,4 +1,4 @@
-import { Briefcase, UserCircle, Send } from 'lucide-react-native';
+import { Briefcase, UserCircle, Send, Repeat } from 'lucide-react-native';
 import { Tabs } from 'expo-router';
 
 export default function TabLayout() {
@@ -38,6 +38,15 @@ export default function TabLayout() {
           title: 'Send',
           tabBarIcon: ({ color }) => (
             <Send size={24} color={color} strokeWidth={2} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="marketplace"
+        options={{
+          title: 'Exchange',
+          tabBarIcon: ({ color }) => (
+            <Repeat size={24} color={color} strokeWidth={2} />
           ),
         }}
       />

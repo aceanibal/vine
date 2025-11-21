@@ -1,6 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { Link, router } from 'expo-router';
-import { Platform, View, ScrollView, type ViewStyle } from 'react-native';
+import { Platform, View, ScrollView, Image, type ViewStyle } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useEffect, useState } from 'react';
 
@@ -71,31 +71,19 @@ export default function WelcomeConsentScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-1 px-8 py-10">
-        <View className="flex-1 justify-between">
-          {/* Header */}
-          <View className="gap-2">
-            <Text 
-              className="text-2xl text-center text-lapis-lazuli"
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              style={{ fontSize: 24, minHeight: 32 }}
-            >
-              Welcome to
-            </Text>
-            <Text
-              className="text-center text-lapis-lazuli font-bold"
-              numberOfLines={1}
-              adjustsFontSizeToFit
-              style={{ fontSize: 48, minHeight: 56 }}
-            >
-              Metals
-            </Text>
-          </View>
-
-          {/* Features */}
-          <View className="gap-10 py-4">
+    <View className="flex-1 bg-white">
+      {/* Logo at the very top, full width */}
+      <Image 
+        source={require('~/assets/auralogo.png')}
+        style={{ width: '100%', height: 300, resizeMode: 'cover' }}
+      />
+      
+      {/* Content below the image */}
+      <SafeAreaView className="flex-1" edges={['bottom', 'left', 'right']}>
+        <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
+          <View className="flex-1 px-8 py-8 justify-between">
+            {/* Features */}
+          <View className="gap-8">
             {FEATURES.map((feature) => (
               <View key={feature.title} className="flex-row gap-5">
                 <View className="pt-1">
@@ -118,7 +106,7 @@ export default function WelcomeConsentScreen() {
                     className="text-blue-green"
                     numberOfLines={3}
                     adjustsFontSizeToFit
-                    style={{ fontSize: 15, lineHeight: 22, minHeight: 66 }}
+                    style={{ fontSize: 15, lineHeight: 21 }}
                   >
                     {feature.description}
                   </Text>
@@ -163,8 +151,9 @@ export default function WelcomeConsentScreen() {
             </Button>
           </View>
         </View>
-      </View>
-    </SafeAreaView>
+        </ScrollView>
+      </SafeAreaView>
+    </View>
   );
 }
 

@@ -1,7 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router, useLocalSearchParams } from 'expo-router';
 import { View, ScrollView, TouchableOpacity, TextInput, Alert, ActivityIndicator, Keyboard, TouchableWithoutFeedback } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { ethers } from 'ethers';
 import * as Clipboard from 'expo-clipboard';
@@ -11,6 +10,7 @@ import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useCurrentWallet, useAllTransfers } from '~/lib/stores/useGlobalStore';
 import { checkDelegationStatus } from '~/lib/services/sponsored-orchestrator';
+import { ScreenWithImageBackground } from '~/components/ScreenWithImageBackground';
 
 export default function AddressScreen() {
   const { colors } = useColorScheme();
@@ -335,8 +335,8 @@ export default function AddressScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
-      <View className="flex-1 rounded-t-3xl bg-white mt-6">
+    <ScreenWithImageBackground showScrollView={false}>
+      <View className="flex-1 rounded-t-3xl bg-white mt-3">
         {/* Header with back/paste/home buttons */}
         <View className="flex-row items-center justify-between p-4">
           <TouchableOpacity onPress={handleBackNavigation}>
@@ -484,6 +484,6 @@ export default function AddressScreen() {
           </Button>
         </View>
       </View>
-    </SafeAreaView>
+    </ScreenWithImageBackground>
   );
 }

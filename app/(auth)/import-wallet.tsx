@@ -8,7 +8,6 @@ import { MaterialIcons } from '@expo/vector-icons';
 import { ethers } from 'ethers';
 import { router } from 'expo-router';
 import { Platform, View, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState, useEffect } from 'react';
 
 import { Button } from 'react-native-paper';
@@ -17,6 +16,7 @@ import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore } from '~/lib/stores/useGlobalStore';
 import { CustomModal } from '~/components/CustomModal';
 import { MnemonicInputGrid } from '~/components/MnemonicInputGrid';
+import { ScreenWithImageBackground } from '~/components/ScreenWithImageBackground';
 
 const ROOT_STYLE = { flex: 1 };
 
@@ -124,8 +124,8 @@ export default function ImportWalletScreen() {
   const wordCount = words.filter((w) => w.length > 0).length;
 
   return (
-    <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
-      <View className="flex-1 rounded-t-3xl bg-white mt-6 p-6">
+    <ScreenWithImageBackground showScrollView={false}>
+      <View className="flex-1 rounded-t-3xl bg-white mt-3 p-6">
         {/* Header */}
         <View className="flex-row items-center justify-between pb-6">
           <TouchableOpacity
@@ -195,6 +195,6 @@ export default function ImportWalletScreen() {
           />
         )}
       </View>
-    </SafeAreaView>
+    </ScreenWithImageBackground>
   );
 } 

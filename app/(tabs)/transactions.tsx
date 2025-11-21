@@ -1,12 +1,12 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { View, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, TouchableOpacity } from 'react-native';
 import { useState, useMemo } from 'react';
 
 import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useAllTransfers, useCurrentWallet, usePredefinedToken } from '~/lib/stores/useGlobalStore';
+import { ScreenWithImageBackground } from '~/components/ScreenWithImageBackground';
 
 export default function TransactionsScreen() {
   const { colors } = useColorScheme();
@@ -155,8 +155,8 @@ export default function TransactionsScreen() {
   );
 
   return (
-    <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
-      <View className="flex-1 rounded-t-3xl bg-white mt-6">
+    <ScreenWithImageBackground>
+      <View className="flex-1 rounded-t-3xl bg-white">
         {/* Header with back button */}
         <View className="flex-row items-center justify-between p-4">
           <TouchableOpacity onPress={() => router.back()}>
@@ -177,7 +177,7 @@ export default function TransactionsScreen() {
       </View>
 
       {/* Transaction List */}
-      <ScrollView className="flex-1 p-4">
+      <View className="flex-1 p-4">
         <View className="gap-3">
           <Text className="text-base text-lapis-lazuli/80">
             {filteredTransactions.length} transaction{filteredTransactions.length !== 1 ? 's' : ''} found
@@ -199,8 +199,8 @@ export default function TransactionsScreen() {
             </View>
           )}
         </View>
-      </ScrollView>
       </View>
-    </SafeAreaView>
+      </View>
+    </ScreenWithImageBackground>
   );
 }

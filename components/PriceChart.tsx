@@ -70,7 +70,7 @@ export function PriceChart({ data, currentPrice, height = 100 }: PriceChartProps
     );
   }
 
-  // Combine historical data with current price (both already in USD per gram)
+  // Combine historical data with current price (both already in USD per ounce)
   let chartDataPoints = data;
   if (currentPrice !== undefined && currentPrice !== null) {
     const today = new Date().toISOString().split('T')[0];

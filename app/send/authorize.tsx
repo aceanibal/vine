@@ -1,7 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
 import { View, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { useState } from 'react';
 
 import { Button } from 'react-native-paper';
@@ -9,6 +8,7 @@ import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore, useCurrentWallet } from '~/lib/stores/useGlobalStore';
 import { approveAuthorizationWithTracking } from '~/lib/services/sponsored-orchestrator';
+import { ScreenWithImageBackground } from '~/components/ScreenWithImageBackground';
 
 export default function AuthorizeScreen() {
   const { colors } = useColorScheme();
@@ -52,8 +52,8 @@ export default function AuthorizeScreen() {
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
-      <View className="flex-1 rounded-t-3xl bg-white mt-6">
+    <ScreenWithImageBackground showScrollView={false}>
+      <View className="flex-1 rounded-t-3xl bg-white mt-3">
         {/* Header with back button */}
         <View className="flex-row items-center justify-between p-4">
           <TouchableOpacity onPress={() => router.push('/(tabs)/dashboard')}>
@@ -176,7 +176,7 @@ export default function AuthorizeScreen() {
           </Button>
         </View>
       </View>
-    </SafeAreaView>
+    </ScreenWithImageBackground>
   );
 }
 

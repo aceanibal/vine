@@ -1,6 +1,5 @@
 import { MaterialIcons } from '@expo/vector-icons';
-import { View, ScrollView } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View } from 'react-native';
 import { useState, useEffect } from 'react';
 import QRCode from 'react-native-qrcode-svg';
 import * as Clipboard from 'expo-clipboard';
@@ -8,6 +7,7 @@ import * as Clipboard from 'expo-clipboard';
 import { Button } from 'react-native-paper';
 import { Text } from '~/components/nativewindui/Text';
 import { useCurrentWallet } from '~/lib/stores/useGlobalStore';
+import { ScreenWithImageBackground } from '~/components/ScreenWithImageBackground';
 
 export default function ReceiveScreen() {
   const currentWallet = useCurrentWallet();
@@ -32,20 +32,20 @@ export default function ReceiveScreen() {
 
   if (isLoading) {
     return (
-      <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
-        <View className="flex-1 rounded-t-3xl bg-white mt-6">
+      <ScreenWithImageBackground>
+        <View className="flex-1 rounded-t-3xl bg-white">
           <View className="flex-1 items-center justify-center">
             <Text className="text-lapis-lazuli">Loading wallet...</Text>
           </View>
         </View>
-      </SafeAreaView>
+      </ScreenWithImageBackground>
     );
   }
 
   if (!currentWallet?.address) {
     return (
-      <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
-        <View className="flex-1 rounded-t-3xl bg-white mt-6">
+      <ScreenWithImageBackground>
+        <View className="flex-1 rounded-t-3xl bg-white">
           <View className="flex-1 items-center justify-center p-4">
             <MaterialIcons name="account-balance-wallet" size={64} color="#7FAFA1" />
             <Text className="mt-4 text-center font-bold text-lapis-lazuli">
@@ -56,14 +56,13 @@ export default function ReceiveScreen() {
             </Text>
           </View>
         </View>
-      </SafeAreaView>
+      </ScreenWithImageBackground>
     );
   }
 
   return (
-    <SafeAreaView className="flex-1" edges={['top']}>
-      <ScrollView className="flex-1" contentContainerStyle={{ flexGrow: 1 }}>
-        <View className="flex-1 p-6">
+    <ScreenWithImageBackground>
+      <View className="flex-1 p-6">
           <View className="gap-6">
             {/* QR Code Section */}
             <View className="items-center">
@@ -106,7 +105,6 @@ export default function ReceiveScreen() {
             </View>
           </View>
         </View>
-      </ScrollView>
       
       {/* Fixed Button at Bottom */}
       <View className="px-6 mb-12 bg-white">
@@ -122,6 +120,6 @@ export default function ReceiveScreen() {
           </Text>
         </Button>
       </View>
-    </SafeAreaView>
+    </ScreenWithImageBackground>
   );
 } 

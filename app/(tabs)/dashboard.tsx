@@ -1,7 +1,6 @@
 import { MaterialIcons } from '@expo/vector-icons';
 import { router } from 'expo-router';
-import { View, ScrollView, TouchableOpacity, RefreshControl, Modal, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, TouchableOpacity, RefreshControl, Modal } from 'react-native';
 import { useState, useEffect, useMemo } from 'react';
 import * as Haptics from 'expo-haptics';
 import * as Clipboard from 'expo-clipboard';
@@ -11,6 +10,7 @@ import { Text } from '~/components/nativewindui/Text';
 import { useColorScheme } from '~/lib/useColorScheme';
 import { useGlobalStore, useCurrentWallet, usePredefinedToken, usePriceHistory } from '~/lib/stores/useGlobalStore';
 import { PriceChart } from '~/components/PriceChart';
+import { ScreenWithImageBackground } from '~/components/ScreenWithImageBackground';
 import ReceiveScreen from './receive';
 
 // Helper functions
@@ -94,7 +94,6 @@ export default function DashboardScreen() {
   const lastUpdated = useGlobalStore((state) => state.appState.lastUpdated);
   const allTransfers = useGlobalStore((state) => state.allTransfers);
   const priceHistory = usePriceHistory();
-  const imageUrl = predefinedToken?.logo;
   // Get recent transactions
   const recentTransactions = useMemo(() => {
     return allTransfers
@@ -224,21 +223,18 @@ export default function DashboardScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-lapis-lazuli" edges={['top']}>
-      <ScrollView 
-        className="flex-1 mt-6"
-        contentContainerStyle={{ flexGrow: 1 }}
-        refreshControl={
-          <RefreshControl
-            refreshing={isRefreshing || isLoading}
-            onRefresh={onRefresh}
-            tintColor="white"
-            colors={['white']}
-            progressBackgroundColor="transparent"
-          />
-        }
-      >
-        <View className="flex-1 rounded-t-3xl bg-white">
+    <ScreenWithImageBackground
+      refreshControl={
+        <RefreshControl
+          refreshing={isRefreshing || isLoading}
+          onRefresh={onRefresh}
+          tintColor="white"
+          colors={['white']}
+          progressBackgroundColor="transparent"
+        />
+      }
+    >
+      <View className="flex-1 rounded-t-3xl bg-white">
           {/* Total Balance */}
           <View className="px-6 pt-6 pb-4">
             <View className="flex-row items-center justify-between">
@@ -263,31 +259,17 @@ export default function DashboardScreen() {
 
           {/* Gold Info */}
           {predefinedToken ? (
-            <View className="gap-1 rounded-xl bg-lapis-lazuli/5 p-2 mx-5 mb-3">
+            <View className="rounded-xl bg-lapis-lazuli/5 p-3 mx-5 mb-3">
+              <Text className="text-lapis-lazuli mb-2" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 16 }}>
+                {predefinedToken?.name}
+              </Text>
               <View className="flex-row items-center justify-between">
-                <View className="flex-1">
-                  <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 20, minHeight: 26 }}>{predefinedToken?.name} Balance</Text>
-                  <Text className="font-semibold mt-1 text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15 }}>
-                    {tokenData.balance} grams
-                  </Text>
-                </View>
-                <Image 
-                  source={{uri: imageUrl}} 
-                  style={{ width: 40, height: 40, opacity: 0.6 }} 
-                  resizeMode="contain"
-                  onError={() => {
-                    console.warn('Failed to load token logo:', imageUrl);
-                  }}
-                />
-              </View>
-              
-              <View className="flex-row items-center justify-between">
-                <View className="flex-1">
-                  <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 20, minHeight: 26 }}>{predefinedToken?.symbol} Price</Text>
-                  <Text className="font-semibold mt-1 text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15 }}>
-                    {tokenData.price ? formatCurrency(tokenData.price) : '---'} per gram
-                  </Text>
-                </View>
+                <Text className="font-bold text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 28 }}>
+                  {tokenData.balance}
+                </Text>
+                <Text className="font-medium text-lapis-lazuli/60" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 18 }}>
+                  {tokenData.price ? formatCurrency(tokenData.price) : '---'}
+                </Text>
               </View>
               
               {/* Price Chart */}
@@ -347,7 +329,7 @@ export default function DashboardScreen() {
                     >
                       <View className="flex-1 mr-2">
                         <Text className="font-medium text-lapis-lazuli" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15 }}>
-                          {isReceive ? 'Received' : 'Sent'} {predefinedToken?.symbol}
+                          {isReceive ? 'Received' : 'Sent'}
                         </Text>
                         <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 12 }}>
                           {formatTransactionDate(transfer.timestamp, transfer.blockNumber)}
@@ -355,7 +337,7 @@ export default function DashboardScreen() {
                       </View>
                       <View className="items-end flex-shrink-0">
                         <Text className={`font-medium ${isReceive ? 'text-cambridge-blue' : 'text-boston-red'}`} numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 15 }}>
-                          {isReceive ? '+' : '-'}{formattedValue} g
+                          {isReceive ? '+' : '-'}{formattedValue} {predefinedToken?.symbol}
                         </Text>
                         <Text className="text-lapis-lazuli/80" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 12 }}>
                           Block #{transfer.blockNumber}
@@ -374,7 +356,6 @@ export default function DashboardScreen() {
             </View>
           </View>
         </View>
-      </ScrollView>
       
       {/* Receive Modal */}
       <Modal
@@ -399,6 +380,6 @@ export default function DashboardScreen() {
           </View>
         </View>
       </Modal>
-    </SafeAreaView>
+    </ScreenWithImageBackground>
   );
 }

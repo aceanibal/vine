@@ -1,5 +1,4 @@
 import { useGlobalStore } from '../stores/useGlobalStore';
-import { checkAndRefreshGoldPrice } from './gold-price';
 
 /**
  * Background service for managing gold price updates
@@ -82,26 +81,38 @@ export class BackgroundGoldPriceService {
   private async checkAndUpdate(): Promise<void> {
     try {
       const state = useGlobalStore.getState();
-      const backendURL = state.backendURL;
       const lastUpdated = state.appState.lastUpdated;
+      const lastHistoryFetch = state.appState.goldPrice.lastHistoryFetch;
       
       // Convert string to Date if needed (happens after rehydration from storage)
       const lastUpdatedDate = lastUpdated 
         ? (lastUpdated instanceof Date ? lastUpdated : new Date(lastUpdated))
         : null;
+      const lastHistoryFetchDate = lastHistoryFetch
+        ? (lastHistoryFetch instanceof Date ? lastHistoryFetch : new Date(lastHistoryFetch))
+        : null;
 
-      if (!backendURL) {
-        console.log('BackgroundGoldPriceService: No backend URL configured');
-        return;
-      }
-
-      const wasUpdated = await checkAndRefreshGoldPrice(backendURL, lastUpdatedDate);
+      // Check if we need to refresh current price (10 minutes = 600,000 milliseconds)
+      const TEN_MINUTES = 10 * 60 * 1000;
+      const now = new Date();
       
-      if (wasUpdated) {
+      if (!lastUpdatedDate || (now.getTime() - lastUpdatedDate.getTime()) > TEN_MINUTES) {
+        console.log('BackgroundGoldPriceService: Gold price is stale, refreshing...');
+        const { fetchAndUpdateCoinGeckoGoldPrice } = await import('./coingecko-gold-price');
+        await fetchAndUpdateCoinGeckoGoldPrice();
         console.log('BackgroundGoldPriceService: Gold price updated successfully');
       } else {
-        console.log('BackgroundGoldPriceService: Gold price check completed - no update needed');
+        console.log('BackgroundGoldPriceService: Gold price is fresh, no update needed');
       }
+
+      // Check if we need to refresh price history (after 4 PM London time, once daily)
+      const { checkAndRefreshPaxGoldPriceHistory } = await import('./gold-history-price');
+      const historyResult = await checkAndRefreshPaxGoldPriceHistory(lastHistoryFetchDate, 30);
+      
+      if (historyResult) {
+        console.log('BackgroundGoldPriceService: Price history updated successfully');
+      }
+      
     } catch (error) {
       console.error('BackgroundGoldPriceService: Error during background check:', error);
     }
