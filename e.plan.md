@@ -48,9 +48,9 @@ npx --yes eas build --platform all --profile production --non-interactive
 ### 5) Store listing checklists (minimum to publish)
 
 - Apple (App Store Connect)
-  - App record for `com.metals.wallet`, display name, category, age rating, privacy policy URL, App Privacy questionnaire, screenshots, description, keywords, support URL, marketing URL (optional).
+  - App record for `com.aura.wallet`, display name, category, age rating, privacy policy URL, App Privacy questionnaire, screenshots, description, keywords, support URL, marketing URL (optional).
 - Google (Play Console)
-  - App for `com.metals.wallet`, app content rating, Data Safety form, privacy policy URL, short/long descriptions, screenshots, feature graphic (optional), contact email/website.
+  - App for `com.aura.wallet`, app content rating, Data Safety form, privacy policy URL, short/long descriptions, screenshots, feature graphic (optional), contact email/website.
 
 ### 6) Connect credentials for EAS Submit (recommended)
 
@@ -125,7 +125,7 @@ npx --yes eas submit -p android --latest --track internal --non-interactive
 ### 11) Create your store listings (where to go and what to fill)
 
 - Apple (App Store Connect → My Apps → “+” → New App)
-  - Platform: iOS; Name; Primary language; Bundle ID: `com.metals.wallet`; SKU; User access.
+  - Platform: iOS; Name; Primary language; Bundle ID: `com.aura.wallet`; SKU; User access.
   - App Information: name, subtitle, categories, privacy policy URL, age rating.
   - App Privacy: complete data collection/usage (Privacy Nutrition Labels).
   - Pricing and Availability: price tier (Free), territories.

@@ -1,9 +1,9 @@
 {
   "expo": {
-    "name": "Metals",
+    "name": "Aura",
     "slug": "my-expo-app",
     "version": "1.0.0",
-    "scheme": "metals-wallet",
+    "scheme": "aura-wallet",
     "web": {
       "bundler": "metro",
       "output": "static",
@@ -30,14 +30,14 @@
     ],
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.metals.wallet",
+      "bundleIdentifier": "com.aura.wallet",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "CFBundleDisplayName": "Metals"
+        "CFBundleDisplayName": "Aura"
       }
     },
     "android": {
-      "package": "com.metals.wallet",
+      "package": "com.aura.wallet",
       "versionCode": 1,
       "adaptiveIcon": {
         "foregroundImage": "./assets/adaptive-icon.png",

@@ -71,7 +71,7 @@ See `app/index.tsx` for a complete implementation of these patterns:
 ### Font Size Hierarchy
 Use explicit `fontSize` values in the `style` prop for precise, consistent sizing:
 
-- **Hero Title**: `fontSize: 48` - Large, bold headlines (e.g., "Metals")
+- **Hero Title**: `fontSize: 48` - Large, bold headlines (e.g., "Aura")
 - **Page Title**: `fontSize: 24` - Secondary titles (e.g., "Welcome to")
 - **Section Headers**: `fontSize: 20` - Feature titles, section headers
 - **Button Text**: `fontSize: 18` - Call-to-action buttons
@@ -87,7 +87,7 @@ Use explicit `fontSize` values in the `style` prop for precise, consistent sizin
   adjustsFontSizeToFit
   style={{ fontSize: 48, minHeight: 56 }}
 >
-  Metals
+  Aura
 </Text>
 ```
 

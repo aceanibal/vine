@@ -54,7 +54,7 @@ export const useGlobalStore = create<GlobalState>()(
       // App config (single token) - using DEFAULT_APP_CONFIG
       defaultChainIdNumeric: DEFAULT_APP_CONFIG.defaultChainIdNumeric,
       predefinedToken: DEFAULT_APP_CONFIG.predefinedToken,
-      backendURL: 'https://metalsbackend.lbf.solutions',
+      backendURL: 'https://aurabackend.lbf.solutions',
 
       // Orchestrator config (single source of truth) - using DEFAULT_APP_CONFIG
       orchestratorConfig: DEFAULT_APP_CONFIG.orchestratorConfig,

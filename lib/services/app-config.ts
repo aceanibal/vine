@@ -35,7 +35,7 @@ export const DEFAULT_APP_CONFIG: AppConfig = {
   orchestratorConfig: {
     delegationAddress: '0x9a686F5eaE58B62B435EAa034d48E57dc94BC36c',
     providerUrl: 'https://polygon-rpc.com',
-    relayerEndpoint: 'https://metalsbackend.lbf.solutions/relay',
+    relayerEndpoint: 'https://aurabackend.lbf.solutions/relay',
     maxRetries: 30,
     retryDelayMs: 2000,
     supportedChains: [137],
